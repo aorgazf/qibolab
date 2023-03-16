@@ -4,14 +4,17 @@ from dataclasses import dataclass, field
 import numpy as np
 from qibo.config import log, raise_error
 from qm.qua import (
+    Random,
     align,
     assign,
     declare,
     declare_stream,
     dual_demod,
+    else_,
     fixed,
     for_,
     frame_rotation_2pi,
+    if_,
     measure,
     play,
     program,
@@ -205,7 +208,7 @@ class QMConfig:
         else:
             self.elements[f"flux{qubit.name}"]["intermediate_frequency"] = intermediate_frequency
 
-    def register_pulse(self, qubit, pulse, time_of_flight, smearing):
+    def register_pulse(self, qubit, pulse, time_of_flight, smearing, op_name=None):
         """Registers pulse, waveforms and integration weights in QM config.
 
         Args:
@@ -218,11 +221,14 @@ class QMConfig:
                 instantiation of the Qubit objects. They are named as
                 "drive0", "drive1", "flux0", "readout0", ...
         """
-        if pulse.serial not in self.pulses:
+        if op_name is None:
+            op_name = pulse.serial
+
+        if op_name not in self.pulses:
             if pulse.type.name == "DRIVE":
                 serial_i = self.register_waveform(pulse, "i")
                 serial_q = self.register_waveform(pulse, "q")
-                self.pulses[pulse.serial] = {
+                self.pulses[op_name] = {
                     "operation": "control",
                     "length": pulse.duration,
                     "waveforms": {"I": serial_i, "Q": serial_q},
@@ -234,11 +240,11 @@ class QMConfig:
                 if qubit.flux:
                     self.register_flux_element(qubit)
                 # register drive pulse in elements
-                self.elements[f"drive{qubit.name}"]["operations"][pulse.serial] = pulse.serial
+                self.elements[f"drive{qubit.name}"]["operations"][op_name] = op_name
 
             elif pulse.type.name == "FLUX":
                 serial = self.register_waveform(pulse)
-                self.pulses[pulse.serial] = {
+                self.pulses[op_name] = {
                     "operation": "control",
                     "length": pulse.duration,
                     "waveforms": {
@@ -248,13 +254,13 @@ class QMConfig:
                 # register flux element (if it does not already exist)
                 self.register_flux_element(qubit, pulse.frequency)
                 # register flux pulse in elements
-                self.elements[f"flux{qubit.name}"]["operations"][pulse.serial] = pulse.serial
+                self.elements[f"flux{qubit.name}"]["operations"][op_name] = op_name
 
             elif pulse.type.name == "READOUT":
                 serial_i = self.register_waveform(pulse, "i")
                 serial_q = self.register_waveform(pulse, "q")
                 self.register_integration_weights(qubit, pulse.duration)
-                self.pulses[pulse.serial] = {
+                self.pulses[op_name] = {
                     "operation": "measurement",
                     "length": pulse.duration,
                     "waveforms": {
@@ -271,11 +277,23 @@ class QMConfig:
                 # register readout element (if it does not already exist)
                 if_frequency = pulse.frequency - int(qubit.readout.local_oscillator.frequency)
                 self.register_readout_element(qubit, if_frequency, time_of_flight, smearing)
+                # register pi-pulse for random flipping
+                pi_pulse = Pulse(
+                    0,
+                    qubit.RX.duration,
+                    qubit.RX.amplitude,
+                    qubit.RX.frequency,
+                    0.0,
+                    qubit.RX.shape,
+                    qubit.drive.name,
+                    qubit=qubit.name,
+                )
+                self.register_pulse(qubit, pi_pulse, time_of_flight, smearing, op_name="pi_pulse")
                 # register flux element (if available)
                 if qubit.flux:
                     self.register_flux_element(qubit)
                 # register readout pulse in elements
-                self.elements[f"readout{qubit.name}"]["operations"][pulse.serial] = pulse.serial
+                self.elements[f"readout{qubit.name}"]["operations"][op_name] = op_name
 
             else:
                 raise_error(TypeError, f"Unknown pulse type {pulse.type.name}.")
@@ -451,6 +469,7 @@ class QMOPX(AbstractInstrument):
 
         self.time_of_flight = 0
         self.smearing = 0
+        self.flip_mitigation = True
         # copied from qblox runcard, not used here yet
         # hardware_avg: 1024
         # sampling_rate: 1_000_000_000
@@ -505,7 +524,7 @@ class QMOPX(AbstractInstrument):
         return machine.execute(program)
 
     @staticmethod
-    def play_pulses(qmsequence, relaxation_time=0):
+    def play_pulses(qmsequence, relaxation_time=0, flip_mitigation=False):
         """Part of QUA program that plays an arbitrary pulse sequence.
 
         Should be used inside a ``program()`` context.
@@ -516,6 +535,9 @@ class QMOPX(AbstractInstrument):
                 hold attributes for the ``element`` and ``operation`` that corresponds to
                 each pulse, as defined in the QM config.
         """
+        if flip_mitigation:
+            rng = Random()
+            flip_flag = declare(bool)
         needs_reset = False
         align()
         clock = collections.defaultdict(int)
@@ -528,6 +550,12 @@ class QMOPX(AbstractInstrument):
                 clock[qmpulse.element] += 4 * wait_cycles
             clock[qmpulse.element] += qmpulse.duration
             if pulse.type.name == "READOUT":
+                # randomly flip qubit before measuring
+                if flip_mitigation:
+                    assign(flip_flag, rng.rand_fixed() < 0.5)
+                    with if_(flip_flag):
+                        play("pi_pulse", f"drive{pulse.qubit}")
+                        align(f"drive{pulse.qubit}", qmpulse.element)
                 measure(
                     qmpulse.operation,
                     qmpulse.element,
@@ -536,7 +564,14 @@ class QMOPX(AbstractInstrument):
                     dual_demod.full("minus_sin", "out1", "cos", "out2", qmpulse.Q),
                 )
                 if qmpulse.threshold is not None:
-                    assign(qmpulse.shot, qmpulse.I * qmpulse.cos - qmpulse.Q * qmpulse.sin > qmpulse.threshold)
+                    if flip_mitigation:
+                        # correct flipped results
+                        with if_(flip_flag):
+                            assign(qmpulse.shot, qmpulse.I * qmpulse.cos - qmpulse.Q * qmpulse.sin <= qmpulse.threshold)
+                        with else_():
+                            assign(qmpulse.shot, qmpulse.I * qmpulse.cos - qmpulse.Q * qmpulse.sin > qmpulse.threshold)
+                    else:
+                        assign(qmpulse.shot, qmpulse.I * qmpulse.cos - qmpulse.Q * qmpulse.sin > qmpulse.threshold)
             else:
                 if not isinstance(qmpulse.relative_phase, float) or qmpulse.relative_phase != 0:
                     frame_rotation_2pi(qmpulse.relative_phase, qmpulse.element)
@@ -627,7 +662,7 @@ class QMOPX(AbstractInstrument):
                 qmpulse.declare_output(threshold, iq_angle)
 
             with for_(n, 0, n < nshots, n + 1):
-                self.play_pulses(qmsequence, relaxation_time)
+                self.play_pulses(qmsequence, relaxation_time, self.flip_mitigation)
 
             with stream_processing():
                 # I_st.average().save("I")
@@ -800,4 +835,4 @@ class QMOPX(AbstractInstrument):
             else:
                 raise_error(NotImplementedError, f"Sweeper for {parameter} is not implemented.")
         else:
-            self.play_pulses(qmsequence, relaxation_time)
+            self.play_pulses(qmsequence, relaxation_time, self.flip_mitigation)
