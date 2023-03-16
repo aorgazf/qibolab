@@ -15,6 +15,18 @@ from qibolab.transpilers import can_execute, transpile
 
 
 @dataclass
+class NativePulse:
+    duration: int
+    amplitude: float
+    frequency: int
+    shape: str
+    type: str
+    start: int = 0
+    phase: float = 0.0
+    if_frequency: Optional[int] = None
+
+
+@dataclass
 class Qubit:
     """Representation of a physical qubit.
 
@@ -48,6 +60,9 @@ class Qubit:
     mean_gnd_states: complex = 0 + 0.0j
     mean_exc_states: complex = 0 + 0.0j
     resonator_polycoef_flux: List[float] = field(default_factory=list)
+
+    RX: Optional[NativePulse] = None
+    MZ: Optional[NativePulse] = None
 
     # filters used for applying CZ gate
     filter: dict = field(default_factory=dict)
@@ -152,6 +167,9 @@ class AbstractPlatform(ABC):
                     setattr(self.qubits[q], name, value)
             else:
                 self.qubits[q] = Qubit(q, **settings["characterization"]["single_qubit"][q])
+            self.qubits[q].RX = NativePulse(**settings["native_gates"]["single_qubit"][q]["RX"])
+            self.qubits[q].MZ = NativePulse(**settings["native_gates"]["single_qubit"][q]["MZ"])
+            # TODO: Register two-qubit gate pulses to qubits
 
     @abstractmethod
     def connect(self):
