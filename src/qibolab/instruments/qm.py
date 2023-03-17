@@ -288,7 +288,7 @@ class QMConfig:
                     qubit.drive.name,
                     qubit=qubit.name,
                 )
-                self.register_pulse(qubit, pi_pulse, time_of_flight, smearing, op_name="pi_pulse")
+                self.register_pulse(qubit, pi_pulse, time_of_flight, smearing, op_name=f"pi_pulse{qubit.name}")
                 # register flux element (if available)
                 if qubit.flux:
                     self.register_flux_element(qubit)
@@ -535,9 +535,6 @@ class QMOPX(AbstractInstrument):
                 hold attributes for the ``element`` and ``operation`` that corresponds to
                 each pulse, as defined in the QM config.
         """
-        if flip_mitigation:
-            rng = Random()
-            flip_flag = declare(bool)
         needs_reset = False
         align()
         clock = collections.defaultdict(int)
@@ -551,11 +548,9 @@ class QMOPX(AbstractInstrument):
             clock[qmpulse.element] += qmpulse.duration
             if pulse.type.name == "READOUT":
                 # randomly flip qubit before measuring
-                if flip_mitigation:
-                    assign(flip_flag, rng.rand_fixed() < 0.5)
-                    with if_(flip_flag):
-                        play("pi_pulse", f"drive{pulse.qubit}")
-                        align(f"drive{pulse.qubit}", qmpulse.element)
+                if qmpulse.threshold is not None and flip_mitigation:
+                    play(f"pi_pulse{pulse.qubit}", f"drive{pulse.qubit}")
+                    align(f"drive{pulse.qubit}", qmpulse.element)
                 measure(
                     qmpulse.operation,
                     qmpulse.element,
@@ -566,10 +561,7 @@ class QMOPX(AbstractInstrument):
                 if qmpulse.threshold is not None:
                     if flip_mitigation:
                         # correct flipped results
-                        with if_(flip_flag):
-                            assign(qmpulse.shot, qmpulse.I * qmpulse.cos - qmpulse.Q * qmpulse.sin <= qmpulse.threshold)
-                        with else_():
-                            assign(qmpulse.shot, qmpulse.I * qmpulse.cos - qmpulse.Q * qmpulse.sin > qmpulse.threshold)
+                        assign(qmpulse.shot, qmpulse.I * qmpulse.cos - qmpulse.Q * qmpulse.sin <= qmpulse.threshold)
                     else:
                         assign(qmpulse.shot, qmpulse.I * qmpulse.cos - qmpulse.Q * qmpulse.sin > qmpulse.threshold)
             else:
@@ -661,8 +653,15 @@ class QMOPX(AbstractInstrument):
                 iq_angle = qubits[qmpulse.pulse.qubit].iq_angle
                 qmpulse.declare_output(threshold, iq_angle)
 
-            with for_(n, 0, n < nshots, n + 1):
-                self.play_pulses(qmsequence, relaxation_time, self.flip_mitigation)
+            if self.flip_mitigation:
+                with for_(n, 0, n < nshots // 2, n + 1):
+                    self.play_pulses(qmsequence, relaxation_time, flip_mitigation=False)
+                    self.play_pulses(qmsequence, relaxation_time, flip_mitigation=True)
+                if nshots % 2 == 1:
+                    self.play_pulses(qmsequence, relaxation_time, flip_mitigation=False)
+            else:
+                with for_(n, 0, n < nshots, n + 1):
+                    self.play_pulses(qmsequence, relaxation_time)
 
             with stream_processing():
                 # I_st.average().save("I")
@@ -835,4 +834,4 @@ class QMOPX(AbstractInstrument):
             else:
                 raise_error(NotImplementedError, f"Sweeper for {parameter} is not implemented.")
         else:
-            self.play_pulses(qmsequence, relaxation_time, self.flip_mitigation)
+            self.play_pulses(qmsequence, relaxation_time)
