@@ -19,7 +19,6 @@ from qblox_instruments.qcodes_drivers.sequencer import Sequencer as QbloxSequenc
 from qibolab.instruments.abstract import AbstractInstrument, InstrumentException
 from qibolab.pulses import Pulse, PulseSequence, PulseShape, PulseType, Waveform
 
-
 class WaveformsBuffer:
     """A class to represent a buffer that holds the unique waveforms used by a sequencer.
 
@@ -1610,6 +1609,9 @@ class ClusterQCM_RF(AbstractInstrument):
                 for parameter in parameters:
                     target.set(parameter, value)
                 self._device_parameters[key] = value
+            print(key)
+            print(value)
+
         else:
             raise Exception("There is no connection to the instrument {self.name}")
 

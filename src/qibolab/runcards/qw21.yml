@@ -51,12 +51,12 @@ channels: [
 
 # [ReadOut, QubitDrive, QubitFlux, QubitBias]
 qubit_channel_map: 
-    A1:   [R2-1a, L3-1, L1-5, L1-5] #qA1
-    A2:   [R2-1a, L3-2, L1-6, L1-6] #qA2
-    A3:   [R2-1b, L3-3, L1-7, L1-7] #qA3
-    A4:   [R2-1a, L3-4, L1-8, L1-8] #qA4
-    A5:   [R2-1b, L3-5, L1-9, L1-9] #qA5
-    A6:   [R2-1b, L3-6, L1-4, L1-4] #qA6
+    A1:   [R2-1a, L3-1, L1-5, null] #qA1
+    A2:   [R2-1a, L3-2, L1-6, null] #qA2
+    A3:   [R2-1b, L3-3, L1-7, null] #qA3
+    A4:   [R2-1a, L3-4, L1-8, null] #qA4
+    A5:   [R2-1b, L3-5, L1-9, null] #qA5
+    A6:   [R2-1b, L3-6, L1-4, null] #qA6
 
 instruments:
     cluster:
@@ -192,10 +192,10 @@ instruments:
         roles: [control]
         settings:
             ports:
-                o1: {gain: 1, offset: 0, hardware_mod_en: false}
-                o2: {gain: 1, offset: 0, hardware_mod_en: false}
-                o3: {gain: 1, offset: 0, hardware_mod_en: false}
-                o4: {gain: 1, offset: 0, hardware_mod_en: false}
+                o1: {gain: 1, offset: 0.60, hardware_mod_en: false} #qA6
+                o2: {gain: 1, offset: -0.65, hardware_mod_en: false} #qA1
+                o3: {gain: 1, offset: -0.45, hardware_mod_en: false} #qA2
+                o4: {gain: 1, offset: 0.05, hardware_mod_en: false} #qA3
             channel_port_map: {L1-4: o1, L1-5: o2, L1-6: o3, L1-7: o4}
 
     #Cluster QCM usado para bias mediante el offset
@@ -206,8 +206,8 @@ instruments:
         roles: [control]
         settings:
             ports:
-                o1: {gain: 1, offset: 0, hardware_mod_en: false}
-                o2: {gain: 1, offset: 0, hardware_mod_en: false}
+                o1: {gain: 1, offset: -0.30, hardware_mod_en: false} #qA4
+                o2: {gain: 1, offset: 0, hardware_mod_en: false} #qA5
                 o3: {gain: 0, offset: 0, hardware_mod_en: false} #not used
                 o4: {gain: 0, offset: 0, hardware_mod_en: false} #not used
             channel_port_map: {L1-8: o1, L1-9: o2, L1-10: o3, L1-11: o4}
@@ -225,7 +225,7 @@ native_gates:
             MZ:
                 duration: 2000
                 amplitude: 0.4
-                frequency: 6_885_464_278     # resonator frequency
+                frequency: 6_885_764_000     # resonator frequency
                 if_frequency: 140_000_000    # difference in resonator frequency
                 shape: Rectangular()
                 type: ro                    # readout     
@@ -240,7 +240,7 @@ native_gates:
             MZ:
                 duration: 2000
                 amplitude: 0.4
-                frequency: 7_266_245_000    # resonator frequency
+                frequency: 7_267_545_000    # resonator frequency
                 if_frequency: -60_000_000    # difference in resonator frequency
                 shape: Rectangular()
                 type: ro                    # readout    
@@ -300,30 +300,32 @@ native_gates:
             MZ:
                 duration: 2000
                 amplitude: 0.4
-                frequency: 7_941_850_000    # resonator frequency
+                frequency: 7_942_750_000    # resonator frequency
                 if_frequency: -60_000_000    # difference in resonator frequency
                 shape: Rectangular()
                 type: ro                    # readout                                        
 characterization:
     single_qubit:
         A1:
-            readout_frequency: 6_885_464_278
+            readout_frequency: 6_885_764_000
             drive_frequency: 5_770_000_000
             T1: 0
             T2: 0
             state0_voltage: 0.0
             state1_voltage: 0.0
             mean_gnd_states: (-0.0+0.0j)
-            mean_exc_states: (0.0+0.0j)     
+            mean_exc_states: (0.0+0.0j)
+            sweetspot: -0.65                          
         A2:
-            readout_frequency: 7_266_245_000 
+            readout_frequency: 7_267_545_000 
             drive_frequency: 5_935_000_000
             T1: 0
             T2: 0
             state0_voltage: 0.0
             state1_voltage: 0.0
             mean_gnd_states: (-0.0+0.0j)
-            mean_exc_states: (0.0+0.0j) 
+            mean_exc_states: (0.0+0.0j)
+            sweetspot: -0.45                      
         A3:
             readout_frequency: 7_521_929_000
             drive_frequency: 6_061_000_000
@@ -332,7 +334,8 @@ characterization:
             state0_voltage: 0.0
             state1_voltage: 0.0
             mean_gnd_states: (-0.0+0.0j)
-            mean_exc_states: (0.0+0.0j)                         
+            mean_exc_states: (0.0+0.0j)    
+            sweetspot: 0.005                                            
         A4:
             readout_frequency: 7_119_714_349
             drive_frequency: 5_285_000_000
@@ -342,6 +345,7 @@ characterization:
             state1_voltage: 0.0
             mean_gnd_states: (-0.0+0.0j)
             mean_exc_states: (0.0+0.0j)
+            sweetspot: -0.3                       
         A5:
             readout_frequency: 7_691_897_000
             drive_frequency: 6_081_000_000 #6_169_000_000
@@ -350,9 +354,10 @@ characterization:
             state0_voltage: 0.0
             state1_voltage: 0.0
             mean_gnd_states: (-0.0+0.0j)
-            mean_exc_states: (0.0+0.0j)                       
+            mean_exc_states: (0.0+0.0j)
+            sweetspot: 0.0                       
         A6:
-            readout_frequency: 7_941_850_000
+            readout_frequency: 7_942_750_000
             drive_frequency: 6_860_000_000
             T1: 0
             T2: 0
@@ -360,3 +365,4 @@ characterization:
             state1_voltage: 0.0
             mean_gnd_states: (-0.0+0.0j)
             mean_exc_states: (0.0+0.0j)                      
+            sweetspot: 0.6                       
