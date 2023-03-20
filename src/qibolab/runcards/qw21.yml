@@ -1,0 +1,362 @@
+nqubits: 1
+description: 21-qubit device at XLD fridge, controlled with qblox cluster rf.
+
+settings:
+    hardware_avg: 2048
+    repetition_duration: 200_000 # 200_000
+    sampling_rate: 1_000_000_000
+
+qubits: [A1, A2, A3, A4, A5, A6]
+
+resonator_type: 2D
+
+topology: # qubit - qubit connections
+-   [ 1, 0, 1, 0, 0, 0]
+-   [ 0, 1, 1, 0, 0, 0]
+-   [ 1, 1, 1, 1, 1, 0]
+-   [ 0, 0, 1, 1, 0, 0]
+-   [ 0, 0, 1, 0, 1, 0]
+-   [ 0, 0, 0, 0, 0, 1]
+
+
+# Drive:
+# L3-1:mod12-o1
+# L3-2:mod12-o2
+# L3-3:mod10-o1
+# L3-4:mod10-o2
+# L3-5:mod6-o1
+# L3-6:mod6-o2
+
+# Flux:
+# L1-4:mod19-o1
+# L1-5:mod19-o2
+# L1-6:mod19-o3
+# L1-7:mod19-o4
+# L1-8:mod14-o1
+# L1-9:mod14-o2
+
+# Readout out:
+# Mod16/18
+
+# Cluster IP:
+# 192.168.0.20
+
+
+# no bias line, using qblox offset from qcm_bbc
+channels: [
+  'L2-1a','R2-1b', #RO channels
+  'L3-1', 'L3-2', 'L3-3', 'L3-4', 'L3-5', 'L3-6', # Drive channels qA1, qA2, qA3, qA4, qA5, qA6 
+  'L1-5', 'L1-6', 'L1-7', 'L1-8', 'L1-9', 'L1-4', 'L1-10', 'L1-11', # Flux channels qA1, qA2, qA3, qA4, qA5, qA6 (L1-10 and L1-11 not used)
+]
+
+# [ReadOut, QubitDrive, QubitFlux, QubitBias]
+qubit_channel_map: 
+    A1:   [R2-1a, L3-1, L1-5, L1-5] #qA1
+    A2:   [R2-1a, L3-2, L1-6, L1-6] #qA2
+    A3:   [R2-1b, L3-3, L1-7, L1-7] #qA3
+    A4:   [R2-1a, L3-4, L1-8, L1-8] #qA4
+    A5:   [R2-1b, L3-5, L1-9, L1-9] #qA5
+    A6:   [R2-1b, L3-6, L1-4, L1-4] #qA6
+
+instruments:
+    cluster:
+        lib: qblox
+        class: Cluster
+        address: 192.168.0.20
+        roles: [other]
+        settings:
+            reference_clock_source      : internal                      # external or internal
+
+    qrm_rf0: # ReadOut module 0: qA1, qA2, qA4
+        lib: qblox
+        class: ClusterQRM_RF
+        address: 192.168.0.20:16
+        roles: [readout]
+        settings:
+            ports:
+                o1:
+                    attenuation                 : 48 # should be multiple of 2
+                    lo_enabled                  : true
+                    lo_frequency                : 7_260_000_000                    # (Hz) from 2e9 to 18e9
+                    gain                        : 0.5                              # for path0 and path1 -1.0<=v<=1.0
+                    hardware_mod_en             : false
+                i1:
+                    hardware_demod_en           : true
+
+            acquisition_hold_off        : 200
+            acquisition_duration        : 2000
+
+            channel_port_map:   # Refrigerator Channel : Instrument port
+                'R2-1a' : o1    # IQ Port = out0 & out1
+                'L2-5' : i1     # Labeled but not used
+
+    qrm_rf1: # ReadOut module 1: qA3, qA5, qA6
+        lib: qblox
+        class: ClusterQRM_RF
+        address: 192.168.0.20:18
+        roles: [readout]
+        settings:
+            ports:
+                o1:
+                    attenuation                 : 46 # should be multiple of 2
+                    lo_enabled                  : true
+                    lo_frequency                : 7_860_000_000                   # (Hz) from 2e9 to 18e9
+                    gain                        : 0.5                              # for path0 and path1 -1.0<=v<=1.0
+                    hardware_mod_en             : false
+                i1:
+                    hardware_demod_en           : true
+
+            acquisition_hold_off        : 200
+            acquisition_duration        : 2000
+
+            channel_port_map:   # Refrigerator Channel : Instrument port
+                'R2-1b' : o1    # IQ Port = out0 & out1
+                'L2-5' : i1     # Labeled but not used
+
+    qcm_rf2:
+        lib: qblox
+        class: ClusterQCM_RF
+        address: 192.168.0.20:12
+        roles: [control]
+        settings:
+            ports:
+                o1: # qubit qA1
+                    attenuation                  : 20 # (dB) # should be multiple of 2
+                    lo_enabled                   : true
+                    lo_frequency                 : 5_970_000_000 # (Hz) from 2e9 to 18e9
+                    gain                         : 0.5 # for path0 and path1 -1.0<=v<=1.0
+                    hardware_mod_en              : false
+                o2: # qubit qA2
+                    attenuation                  : 20 # (dB)
+                    lo_enabled                   : true
+                    lo_frequency                 : 6_135_000_000 # (Hz) from 2e9 to 18e9
+                    gain                         : 0.5 # for path0 and path1 -1.0<=v<=1.0
+                    hardware_mod_en              : false
+
+            channel_port_map:
+                'L3-1': o1 # 1
+                'L3-2': o2 # 0
+
+    qcm_rf3:
+        lib: qblox
+        class: ClusterQCM_RF
+        address: 192.168.0.20:10
+        roles: [control]
+        settings:
+            ports:
+                o1: # qubit qA3
+                    attenuation                  : 24 # (dB)
+                    lo_enabled                   : true
+                    lo_frequency                 : 6_801_000_000 # (Hz) from 2e9 to 18e9
+                    gain                         : 0.5 # for path0 and path1 -1.0<=v<=1.0
+                    hardware_mod_en              : false
+                o2: # qubit qA4
+                    attenuation                  : 16 # (dB)
+                    lo_enabled                   : true
+                    lo_frequency                 : 5_485_000_000 # (Hz) from 2e9 to 18e9
+                    gain                         : 0.5 # for path0 and path1 -1.0<=v<=1.0
+                    hardware_mod_en              : false
+
+            channel_port_map:
+                'L3-3': o1 # 1
+                'L3-4': o2 # 0
+    qcm_rf4:
+        lib: qblox
+        class: ClusterQCM_RF
+        address: 192.168.0.20:6
+        roles: [control]
+        settings:
+            ports:
+                o1: # qubit qA5
+                    attenuation                  : 24 # (dB)
+                    lo_enabled                   : true
+                    lo_frequency                 : 6_369_000_000 # (Hz) from 2e9 to 18e9
+                    gain                         : 0.5 # for path0 and path1 -1.0<=v<=1.0
+                    hardware_mod_en              : false
+                o2: # qubit qA6
+                    attenuation                  : 32 # (dB)
+                    lo_enabled                   : true
+                    lo_frequency                 : 7_060_000_000 # (Hz) from 2e9 to 18e9
+                    gain                         : 0.5 # for path0 and path1 -1.0<=v<=1.0
+                    hardware_mod_en              : false
+
+            channel_port_map:
+                'L3-5': o1 # 1
+                'L3-6': o2 # 0
+
+    #Cluster QCM usado para bias mediante el offset
+    qcm_bb1:
+        lib: qblox
+        class: ClusterQCM
+        address: 192.168.0.20:19
+        roles: [control]
+        settings:
+            ports:
+                o1: {gain: 1, offset: 0, hardware_mod_en: false}
+                o2: {gain: 1, offset: 0, hardware_mod_en: false}
+                o3: {gain: 1, offset: 0, hardware_mod_en: false}
+                o4: {gain: 1, offset: 0, hardware_mod_en: false}
+            channel_port_map: {L1-4: o1, L1-5: o2, L1-6: o3, L1-7: o4}
+
+    #Cluster QCM usado para bias mediante el offset
+    qcm_bb2:
+        lib: qblox
+        class: ClusterQCM
+        address: 192.168.0.20:14
+        roles: [control]
+        settings:
+            ports:
+                o1: {gain: 1, offset: 0, hardware_mod_en: false}
+                o2: {gain: 1, offset: 0, hardware_mod_en: false}
+                o3: {gain: 0, offset: 0, hardware_mod_en: false} #not used
+                o4: {gain: 0, offset: 0, hardware_mod_en: false} #not used
+            channel_port_map: {L1-8: o1, L1-9: o2, L1-10: o3, L1-11: o4}
+
+native_gates:
+    single_qubit:
+        A1: # qubit id
+            RX:
+                duration: 0                   # should be multiple of 4
+                amplitude: 0.5
+                frequency: 5_770_000_000    # qubit frequency
+                if_frequency: -200_000_000  # difference in qubit frequency
+                shape: Gaussian(5)
+                type: qd                    # qubit drive
+            MZ:
+                duration: 2000
+                amplitude: 0.4
+                frequency: 6_885_464_278     # resonator frequency
+                if_frequency: 140_000_000    # difference in resonator frequency
+                shape: Rectangular()
+                type: ro                    # readout     
+        A2: # qubit id
+            RX:
+                duration: 0                   # should be multiple of 4
+                amplitude: 0.5
+                frequency: 5_935_000_000    # qubit frequency
+                if_frequency: -200_000_000  # difference in qubit frequency
+                shape: Gaussian(5)
+                type: qd                    # qubit drive
+            MZ:
+                duration: 2000
+                amplitude: 0.4
+                frequency: 7_266_245_000    # resonator frequency
+                if_frequency: -60_000_000    # difference in resonator frequency
+                shape: Rectangular()
+                type: ro                    # readout    
+        A3: # qubit id
+            RX:
+                duration: 0                   # should be multiple of 4
+                amplitude: 0.5
+                frequency: 6_061_000_000    # qubit frequency
+                if_frequency: -200_000_000  # difference in qubit frequency
+                shape: Gaussian(5)
+                type: qd                    # qubit drive
+            MZ:
+                duration: 2000
+                amplitude: 0.4
+                frequency: 7_521_929_000    # resonator frequency
+                if_frequency: 140_000_000    # difference in resonator frequency
+                shape: Rectangular()
+                type: ro                    # readout       
+        A4: # qubit id
+            RX:
+                duration: 0                   # should be multiple of 4
+                amplitude: 0.5
+                frequency: 5_285_000_000    # qubit frequency
+                if_frequency: -200_000_000  # difference in qubit frequency
+                shape: Gaussian(5)
+                type: qd                    # qubit drive
+            MZ:
+                duration: 2000
+                amplitude: 0.4
+                frequency: 7_119_714_349    # resonator frequency
+                if_frequency: -260_000_000    # difference in resonator frequency
+                shape: Rectangular()
+                type: ro                    # readout             
+        A5: # qubit id
+            RX:
+                duration: 0                   # should be multiple of 4
+                amplitude: 0.5
+                frequency: 6_081_000_000 #6_169_000_000    # qubit frequency
+                if_frequency: -200_000_000  # difference in qubit frequency
+                shape: Gaussian(5)
+                type: qd                    # qubit drive
+            MZ:
+                duration: 2000
+                amplitude: 0.4
+                frequency: 7_691_897_000      # resonator frequency
+                if_frequency: -260_000_000    # difference in resonator frequency
+                shape: Rectangular()
+                type: ro                    # readout       
+        A6: # qubit id
+            RX:
+                duration: 0                   # should be multiple of 4
+                amplitude: 0.5
+                frequency: 6_860_000_000    # qubit frequency
+                if_frequency: -200_000_000  # difference in qubit frequency
+                shape: Gaussian(5)
+                type: qd                    # qubit drive
+            MZ:
+                duration: 2000
+                amplitude: 0.4
+                frequency: 7_941_850_000    # resonator frequency
+                if_frequency: -60_000_000    # difference in resonator frequency
+                shape: Rectangular()
+                type: ro                    # readout                                        
+characterization:
+    single_qubit:
+        A1:
+            readout_frequency: 6_885_464_278
+            drive_frequency: 5_770_000_000
+            T1: 0
+            T2: 0
+            state0_voltage: 0.0
+            state1_voltage: 0.0
+            mean_gnd_states: (-0.0+0.0j)
+            mean_exc_states: (0.0+0.0j)     
+        A2:
+            readout_frequency: 7_266_245_000 
+            drive_frequency: 5_935_000_000
+            T1: 0
+            T2: 0
+            state0_voltage: 0.0
+            state1_voltage: 0.0
+            mean_gnd_states: (-0.0+0.0j)
+            mean_exc_states: (0.0+0.0j) 
+        A3:
+            readout_frequency: 7_521_929_000
+            drive_frequency: 6_061_000_000
+            T1: 0
+            T2: 0
+            state0_voltage: 0.0
+            state1_voltage: 0.0
+            mean_gnd_states: (-0.0+0.0j)
+            mean_exc_states: (0.0+0.0j)                         
+        A4:
+            readout_frequency: 7_119_714_349
+            drive_frequency: 5_285_000_000
+            T1: 0
+            T2: 0
+            state0_voltage: 0.0
+            state1_voltage: 0.0
+            mean_gnd_states: (-0.0+0.0j)
+            mean_exc_states: (0.0+0.0j)
+        A5:
+            readout_frequency: 7_691_897_000
+            drive_frequency: 6_081_000_000 #6_169_000_000
+            T1: 0
+            T2: 0
+            state0_voltage: 0.0
+            state1_voltage: 0.0
+            mean_gnd_states: (-0.0+0.0j)
+            mean_exc_states: (0.0+0.0j)                       
+        A6:
+            readout_frequency: 7_941_850_000
+            drive_frequency: 6_860_000_000
+            T1: 0
+            T2: 0
+            state0_voltage: 0.0
+            state1_voltage: 0.0
+            mean_gnd_states: (-0.0+0.0j)
+            mean_exc_states: (0.0+0.0j)                      
