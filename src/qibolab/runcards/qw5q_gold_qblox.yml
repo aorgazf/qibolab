@@ -52,11 +52,11 @@ channels: [
 
 # [ReadOut, QubitDrive, QubitFlux, QubitBias]
 qubit_channel_map: 
-    0:   [L2-5a, L3-15, L4-5, null] #q0
-    1:   [L2-5a, L3-11, L4-1, null] #q1
-    2:   [L2-5a, L3-12, L4-2, null] #q2
-    3:   [L2-5b, L3-13, L4-3, null] #q3
-    4:   [L2-5b, L3-14, L4-4, null] #q4
+    0:   [L3-25a, L3-15, L4-5, null] #q0
+    1:   [L3-25a, L3-11, L4-1, null] #q1
+    2:   [L3-25a, L3-12, L4-2, null] #q2
+    3:   [L3-25b, L3-13, L4-3, null] #q3
+    4:   [L3-25b, L3-14, L4-4, null] #q4
 
 instruments:
     cluster:
@@ -87,8 +87,8 @@ instruments:
             acquisition_duration        : 2000
 
             channel_port_map:   # Refrigerator Channel : Instrument port
-                'L2-5a' : o1    # IQ Port = out0 & out1
-                'L3-25a' : i1     # Labeled but not used
+                'L3-25a' : o1    # IQ Port = out0 & out1
+                'L2-5a' : i1     # Labeled but not used
 
     qrm_rf1: # ReadOut module 12: controlling qubits q2, q3
         lib: qblox
@@ -110,8 +110,8 @@ instruments:
             acquisition_duration        : 2000
 
             channel_port_map:   # Refrigerator Channel : Instrument port
-                'L2-5b' : o1    # IQ Port = out0 & out1
-                'L3-25b' : i1     # Labeled but not used
+                'L3-25b' : o1    # IQ Port = out0 & out1
+                'L2-5b' : i1     # Labeled but not used
 
     qcm_rf2:
         lib: qblox
@@ -211,14 +211,14 @@ instruments:
                 o4: {gain: 0, offset: 0, hardware_mod_en: false} #not used
             channel_port_map: {L4-5: o1, L4-6: o2, L4-7: o3, L4-8: o4}
 
-    # twpa_pump:
-    #     lib: rohde_schwarz
-    #     class: SGS100A
-    #     address: 192.168.0.38
-    #     roles: [other]
-    #     settings:
-    #         frequency: 6_837_500_000 # Hz
-    #         power: 0 # dBm
+    twpa_pump:
+        lib: rohde_schwarz
+        class: SGS100A
+        address: 192.168.0.37
+        roles: [other]
+        settings:
+            frequency: 6_511_000_000 # Hz
+            power: 4.5 # dBm
 
 native_gates:
     single_qubit:
