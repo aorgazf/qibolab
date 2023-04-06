@@ -73,6 +73,9 @@ class QibolabBackend(NumpyBackend):
             # Transform a circuit into proper connectivity and native gates
             log.info("Transpiling circuit.")
             native_circuit, _ = transpile(circuit, two_qubit_natives)
+            print('1. native circuit')
+            print(native_circuit.draw())
+            print(native_circuit.queue[0])
             if check_transpiled:
                 backend = NumpyBackend()
                 target_state = backend.execute_circuit(circuit).state()
@@ -83,6 +86,8 @@ class QibolabBackend(NumpyBackend):
 
         # Transpile the native circuit into a sequence of pulses ``PulseSequence``
         sequence = self.platform.transpile(native_circuit)
+        print(sequence)
+
 
         if not self.platform.is_connected:
             self.platform.connect()
@@ -93,7 +98,6 @@ class QibolabBackend(NumpyBackend):
         readout = self.platform.execute_pulse_sequence(sequence, nshots)
         self.platform.stop()
         result = CircuitResult(self, native_circuit, readout, nshots)
-        print(native_circuit.draw())
         # Register measurement outcomes
         if isinstance(readout, dict):
             for gate in native_circuit.queue:
