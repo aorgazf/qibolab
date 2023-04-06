@@ -207,6 +207,19 @@ class AbstractPlatform(ABC):
                     qubit = gate.target_qubits[0]
                     virtual_z_phases[qubit] += gate.parameters[0]
 
+                elif isinstance(gate, gates.RX):
+                    qubit = gate.target_qubits[0]
+                    angle_fraction = gate.parameters[0]/np.pi
+                    RXn_pulse = self.create_RXn_pulse(
+                        qubit,
+                        angle_fraction,
+                        start=max(sequence.get_qubit_pulses(qubit).finish, moment_start),
+                        relative_phase=virtual_z_phases[qubit],
+                    )
+                    # apply RX(pi/x)
+                    sequence.add(RXn_pulse)
+
+
                 elif isinstance(gate, gates.U3):
                     qubit = gate.target_qubits[0]
                     # Transform gate to U3 and add pi/2-pulses
@@ -240,6 +253,7 @@ class AbstractPlatform(ABC):
                         MZ_pulse = self.create_MZ_pulse(qubit, start=measurement_start)
                         sequence.add(MZ_pulse)
                         gate.pulses = (*gate.pulses, MZ_pulse.serial)
+                    print(gate.pulses)
 
                 elif isinstance(gate, gates.CZ):
                     # create CZ pulse sequence with start time = 0
@@ -335,6 +349,16 @@ class AbstractPlatform(ABC):
         qd_duration = pulse_kwargs["duration"]
         qd_frequency = pulse_kwargs["frequency"]
         qd_amplitude = pulse_kwargs["amplitude"] / 2.0
+        qd_shape = pulse_kwargs["shape"]
+        qd_channel = self.get_qd_channel(qubit)
+        return Pulse(start, qd_duration, qd_amplitude, qd_frequency, relative_phase, qd_shape, qd_channel, qubit=qubit)
+    
+    # TODO: Maybe create a dataclass for native gates
+    def create_RXn_pulse(self, qubit, n, start=0, relative_phase=0):
+        pulse_kwargs = self.native_single_qubit_gates[qubit]["RX"]
+        qd_duration = pulse_kwargs["duration"]
+        qd_frequency = pulse_kwargs["frequency"]
+        qd_amplitude = pulse_kwargs["amplitude"] / float(n)
         qd_shape = pulse_kwargs["shape"]
         qd_channel = self.get_qd_channel(qubit)
         return Pulse(start, qd_duration, qd_amplitude, qd_frequency, relative_phase, qd_shape, qd_channel, qubit=qubit)

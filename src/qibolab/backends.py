@@ -93,12 +93,13 @@ class QibolabBackend(NumpyBackend):
         readout = self.platform.execute_pulse_sequence(sequence, nshots)
         self.platform.stop()
         result = CircuitResult(self, native_circuit, readout, nshots)
-
+        print(native_circuit.draw())
         # Register measurement outcomes
         if isinstance(readout, dict):
             for gate in native_circuit.queue:
                 if isinstance(gate, gates.M):
                     samples = []
+                    print(gate.pulses)
                     for serial in gate.pulses:
                         shots = readout[serial].shots
                         if shots is not None:

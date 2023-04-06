@@ -115,7 +115,7 @@ onequbit_dec.add(gates.T, [gates.RZ(0, np.pi / 4)])
 onequbit_dec.add(gates.TDG, [gates.RZ(0, -np.pi / 4)])
 onequbit_dec.add(gates.I, [gates.I(0)])
 onequbit_dec.add(gates.Align, [gates.Align(0)])
-onequbit_dec.add(gates.RX, lambda gate: [gates.U3(0, gate.parameters[0], -np.pi / 2, np.pi / 2)])
+onequbit_dec.add(gates.RX, lambda gate: [gate])
 onequbit_dec.add(gates.RY, lambda gate: [gates.U3(0, gate.parameters[0], 0, 0)])
 # apply virtually by changing ``phase`` instead of using pulses
 onequbit_dec.add(gates.RZ, lambda gate: [gates.RZ(0, gate.parameters[0])])
