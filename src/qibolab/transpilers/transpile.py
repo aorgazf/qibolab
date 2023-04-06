@@ -91,7 +91,7 @@ def can_execute(circuit, two_qubit_natives, middle_qubit=2, verbose=True):
             continue
 
         if len(gate.qubits) == 1:
-            if not isinstance(gate, (gates.I, gates.Z, gates.RZ, gates.U3)):
+            if not isinstance(gate, (gates.I, gates.Z, gates.RZ, gates.U3, gates.RX)):
                 vlog(f"{gate.name} is not a single qubit native gate.")
                 return False
 

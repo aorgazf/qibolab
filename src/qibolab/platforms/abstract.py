@@ -253,7 +253,6 @@ class AbstractPlatform(ABC):
                         MZ_pulse = self.create_MZ_pulse(qubit, start=measurement_start)
                         sequence.add(MZ_pulse)
                         gate.pulses = (*gate.pulses, MZ_pulse.serial)
-                    print(gate.pulses)
 
                 elif isinstance(gate, gates.CZ):
                     # create CZ pulse sequence with start time = 0
