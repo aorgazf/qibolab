@@ -584,7 +584,6 @@ class Pulse:
         # self._qubit: int | str = None
         self._id: int = Pulse.count
         Pulse.count += 1
-
         self.start = start
         self.duration = duration
         self.amplitude = amplitude
@@ -666,7 +665,7 @@ class Pulse:
         elif isinstance(value, int):
             self._duration = value
 
-        if self._start:
+        if self._start or isinstance(self._start, int):
             if isinstance(self._start, se_int) or isinstance(self._duration, se_int):
                 self._finish = (self._start + self._duration)["_p" + str(self._id) + "_finish"]
             else:
