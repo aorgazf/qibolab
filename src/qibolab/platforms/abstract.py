@@ -214,12 +214,12 @@ class AbstractPlatform(ABC):
 
                 elif isinstance(gate, gates.RX):
                     qubit = gate.target_qubits[0]
-                    angle_fraction = gate.parameters[0]/np.pi
+                    angle_fraction = gate.parameters[0] / np.pi
                     # Instead of rotation more than pi, the choise here is to
                     # rotate in the other direction. Instead of 3pi/4, it's -pi/2.
                     if angle_fraction > 1:
                         angle_fraction = 2 - angle_fraction
-                        set_phase = - np.pi
+                        set_phase = -np.pi
                     else:
                         set_phase = 0
                     RXn_pulse = self.create_RXn_pulse(
@@ -249,9 +249,7 @@ class AbstractPlatform(ABC):
                     virtual_z_phases[qubit] += theta
                     # Fetch pi/2 pulse from calibration
                     RX90_pulse_2 = self.create_RX90_pulse(
-                        qubit,
-                        start=RX90_pulse_1.finish,
-                        relative_phase=virtual_z_phases[qubit] - np.pi
+                        qubit, start=RX90_pulse_1.finish, relative_phase=virtual_z_phases[qubit] - np.pi
                     )
                     # apply RX(-pi/2)
                     sequence.add(RX90_pulse_2)
@@ -366,7 +364,7 @@ class AbstractPlatform(ABC):
         qd_shape = pulse_kwargs["shape"]
         qd_channel = self.get_qd_channel(qubit)
         return Pulse(start, qd_duration, qd_amplitude, qd_frequency, relative_phase, qd_shape, qd_channel, qubit=qubit)
-    
+
     def create_RXn_pulse(self, qubit, n, start=0, relative_phase=0):
         pulse_kwargs = self.native_single_qubit_gates[qubit]["RX"]
         qd_duration = pulse_kwargs["duration"]
