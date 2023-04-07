@@ -635,6 +635,7 @@ class Pulse:
             else:
                 self._finish = self._start + self._duration
 
+
     @property
     def duration(self) -> int:
         """Returns the duration of the pulse, in ns."""
