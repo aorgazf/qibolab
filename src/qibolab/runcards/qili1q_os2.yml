@@ -3,7 +3,8 @@ description: 1-qubit device OS2 in XLD fridge, controlled with qblox cluster rf.
 
 settings:
     hardware_avg: 1024
-    repetition_duration: 200_000
+    # repetition_duration: 200_000
+    relaxation_time: 200_000
     sampling_rate: 1_000_000_000
 
 qubits: [0]
@@ -51,9 +52,9 @@ instruments:
 
                 0:                      # qubit id
 
-                    rotation_angle: 176.045  # in degrees 0.0<=v<=360.0
+                    rotation_angle: 171.71425827320832  # in degrees 0.0<=v<=360.0
 
-                    threshold: -0.001283       # in V
+                    threshold: -0.00109602703027449       # in V
 
             channel_port_map:  # Refrigerator Channel : Instrument port
                 'L3-17_ro': o1 # IQ Port = out0 & out1
@@ -67,7 +68,7 @@ instruments:
         settings:
             ports:
                 o1:
-                    attenuation                  : 12 # (dB)
+                    attenuation                  : 0 # (dB)
                     lo_enabled                   : true
                     lo_frequency                 : 5_179_856_329 # (Hz) from 2e9 to 18e9
                     gain                         : 0.35 # for path0 and path1 -1.0<=v<=1.0
@@ -82,14 +83,14 @@ instruments:
             channel_port_map:
                 'L3-17_qd': o1 # IQ Port = out0 & out1
                 99: o2
-    twpa_pump:
-        lib: erasynth
-        class: ERA
-        address: /dev/ttyERA
-        roles: [other]
-        settings:
-            frequency: 6.816e+9 # Hz
-            power: 2.3 # dBm
+    # twpa_pump:
+    #     lib: rohde_schwarz
+    #     class: SGS100A
+    #     address: 192.168.0.37
+    #     roles: [other]
+    #     settings:
+    #         frequency: 6.816e+9 # Hz
+    #         power: 2.3 # dBm
 
 native_gates:
     single_qubit:
@@ -116,7 +117,7 @@ characterization:
             drive_frequency: 5_079_856_329
             T1: 16832
             T2: 12405
-            state0_voltage: 2000
-            state1_voltage: 1000
-            mean_gnd_states: (0.002704-0.000786j)
-            mean_exc_states: (-0.000596-0.000932j)
+            state0_voltage: 1932.61
+            state1_voltage: 700.0842
+            mean_gnd_states: (0.0020676463937316803-0.0003524553366969956j)
+            mean_exc_states: (0.0004204762304592086-0.0005923328632602588j)
