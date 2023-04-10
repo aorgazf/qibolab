@@ -212,24 +212,43 @@ class AbstractPlatform(ABC):
                         angle -= 2 * np.pi
                     virtual_z_phases[qubit] += angle
 
-                elif isinstance(gate, gates.RX):
+                elif isinstance(gate, (gates.RX, gates.RY)):
+                    from qibo.config import PRECISION_TOL
+
                     qubit = gate.target_qubits[0]
                     angle_fraction = gate.parameters[0] / np.pi
                     # Instead of rotation more than pi, the choise here is to
                     # rotate in the other direction. Instead of 3pi/4, it's -pi/2.
-                    if angle_fraction > 1:
-                        angle_fraction = 2 - angle_fraction
-                        set_phase = -np.pi
+                    set_phase = 0 if isinstance(gate, gates.RX) else np.pi / 2
+                    
+                    if np.abs(angle_fraction - 2) < PRECISION_TOL:
+                        X_pulse1 = self.create_RX_pulse(
+                            qubit,
+                            start=max(sequence.get_qubit_pulses(qubit).finish, moment_start),
+                            relative_phase=virtual_z_phases[qubit],
+                        )
+                        sequence.add(X_pulse1)
+                        X_pulse2 = self.create_RX_pulse(
+                            qubit,
+                            start=sequence.get_qubit_pulses(qubit).finish,
+                            relative_phase=virtual_z_phases[qubit],
+                        )
+                        sequence.add(X_pulse2)
+
                     else:
-                        set_phase = 0
-                    RXn_pulse = self.create_RXn_pulse(
-                        qubit,
-                        1 / angle_fraction,
-                        start=max(sequence.get_qubit_pulses(qubit).finish, moment_start),
-                        relative_phase=virtual_z_phases[qubit] + set_phase,
-                    )
-                    # Apply `RX(pi * angle_fraction)`.
-                    sequence.add(RXn_pulse)
+                        if angle_fraction > 1 - PRECISION_TOL:
+                            angle_fraction = 2 - angle_fraction
+                            set_phase -= np.pi
+
+                        # Apply `RX(pi * angle_fraction)`.
+                        RXn_pulse = self.create_RXn_pulse(
+                            qubit,
+                            1 / angle_fraction,
+                            start=max(sequence.get_qubit_pulses(qubit).finish, moment_start),
+                            relative_phase=virtual_z_phases[qubit] + set_phase,
+                        )
+
+                        sequence.add(RXn_pulse)
 
                 elif isinstance(gate, gates.U3):
                     qubit = gate.target_qubits[0]
