@@ -219,8 +219,8 @@ class AbstractPlatform(ABC):
                     angle_fraction = gate.parameters[0] / np.pi
                     # Instead of rotation more than pi, the choise here is to
                     # rotate in the other direction. Instead of 3pi/4, it's -pi/2.
-                    set_phase = 0 if isinstance(gate, gates.RX) else np.pi / 2
-                    
+                    set_phase = 0 if isinstance(gate, gates.RX) else -np.pi / 2
+
                     if np.abs(angle_fraction - 2) < PRECISION_TOL:
                         X_pulse1 = self.create_RX_pulse(
                             qubit,
