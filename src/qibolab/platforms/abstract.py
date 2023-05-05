@@ -181,11 +181,11 @@ class AbstractPlatform(ABC):
                 # resonator_spectroscopy / resonator_spectroscopy_flux / resonator_punchout_attenuation
                 if par == "readout_frequency":
                     freq = int(value * 1e9)
-                    self.native_single_qubit_gates[qubit]["MZ"]["frequency"] = freq
+                    self.single_qubit_natives[qubit]["MZ"]["frequency"] = freq
                     self.current_config["native_gates"]["single_qubit"][qubit]["MZ"]["frequency"] = freq
 
-                    if "if_frequency" in self.native_single_qubit_gates[qubit]["MZ"]:
-                        self.native_single_qubit_gates[qubit]["MZ"][
+                    if "if_frequency" in self.single_qubit_natives[qubit]["MZ"]:
+                        self.single_qubit_natives[qubit]["MZ"][
                             "if_frequency"
                         ] = freq - self.get_lo_readout_frequency(qubit)
                         self.current_config["native_gates"]["single_qubit"][qubit]["MZ"][
@@ -216,7 +216,7 @@ class AbstractPlatform(ABC):
                 # qubit_spectroscopy / qubit_spectroscopy_flux / ramsey
                 elif par == "drive_frequency":
                     freq = int(value * 1e9)
-                    self.native_single_qubit_gates[qubit]["RX"]["frequency"] = freq
+                    self.single_qubit_natives[qubit]["RX"]["frequency"] = freq
                     self.current_config["native_gates"]["single_qubit"][qubit]["RX"]["frequency"] = freq
 
                     self.qubits[qubit].drive_frequency = freq
@@ -226,19 +226,19 @@ class AbstractPlatform(ABC):
                     amplitude = float(value)
                     # resonator_spectroscopy
                     if par == "readout_amplitude" and not math.isnan(amplitude):
-                        self.native_single_qubit_gates[qubit]["MZ"]["amplitude"] = amplitude
+                        self.single_qubit_natives[qubit]["MZ"]["amplitude"] = amplitude
                         self.current_config["native_gates"]["single_qubit"][qubit]["MZ"]["amplitude"] = amplitude
 
                     # rabi_amplitude / flipping
                     if par == "drive_amplitude" or par == "amplitudes":
-                        self.native_single_qubit_gates[qubit]["RX"]["amplitude"] = amplitude
+                        self.single_qubit_natives[qubit]["RX"]["amplitude"] = amplitude
                         self.current_config["native_gates"]["single_qubit"][qubit]["RX"]["amplitude"] = amplitude
                         self.current_config["characterization"]["single_qubit"][qubit]["pi_pulse_amplitude"] = amplitude
 
                 # rabi_duration
                 elif par == "drive_length":
                     duration = int(value)
-                    self.native_single_qubit_gates[qubit]["RX"]["duration"] = duration
+                    self.single_qubit_natives[qubit]["RX"]["duration"] = duration
                     self.current_config["native_gates"]["single_qubit"][qubit]["RX"]["duration"] = duration
 
                 # ramsey / spin_echo
@@ -279,9 +279,9 @@ class AbstractPlatform(ABC):
 
                 # drag pulse tunning
                 elif "beta" in par:
-                    shape = self.native_single_qubit_gates[qubit]["RX"]["shape"]
+                    shape = self.single_qubit_natives[qubit]["RX"]["shape"]
                     rel_sigma = re.findall(r"[\d]+[.\d]+|[\d]*[.][\d]+|[\d]+", shape)[0]
-                    self.native_single_qubit_gates[qubit]["RX"]["shape"] = f"Drag({rel_sigma}, {float(value)})"
+                    self.single_qubit_natives[qubit]["RX"]["shape"] = f"Drag({rel_sigma}, {float(value)})"
                     self.current_config["native_gates"]["single_qubit"][qubit]["RX"][
                         "shape"
                     ] = f"Drag({rel_sigma}, {float(value)})"

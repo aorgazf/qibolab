@@ -54,7 +54,7 @@ class MultiqubitPlatform(AbstractPlatform):
         if hasattr(self, "qubit_instrument_map"):
             for qubit in range(self.nqubits):
                 instrument_name = self.qubit_instrument_map[qubit][0]
-                port = self.qrm[qubit].channel_port_map[self.qubit_channel_map[qubit][0]]
+                port = self.qrm[qubit]._channel_port_map[self.qubit_channel_map[qubit][0]]
                 att = self.current_config["instruments"][instrument_name]["settings"]["ports"][port]["attenuation"]
                 self.ro_port[qubit].attenuation = att
 
@@ -83,7 +83,7 @@ class MultiqubitPlatform(AbstractPlatform):
                     attenuation = int(value)
                     # save current_config
                     instrument_name = self.qubit_instrument_map[qubit][0]
-                    port = self.qrm[qubit].channel_port_map[self.qubit_channel_map[qubit][0]]
+                    port = self.qrm[qubit]._channel_port_map[self.qubit_channel_map[qubit][0]]
                     self.current_config["instruments"][instrument_name]["settings"]["ports"][port][
                         "attenuation"
                     ] = attenuation
@@ -95,7 +95,7 @@ class MultiqubitPlatform(AbstractPlatform):
                     sweetspot = float(value)
                     # save current_config
                     instrument_name = self.qubit_instrument_map[qubit][2]
-                    port = elf.qrm[qubit].channel_port_map[self.qubit_channel_map[qubit][2]]
+                    port = elf.qrm[qubit]._channel_port_map[self.qubit_channel_map[qubit][2]]
                     self.current_config["instruments"][instrument_name]["settings"]["ports"][port][offset] = sweetspot
                     # configure instrument qcm_bb offset
                     self.qb_port[qubit].current = sweetspot
@@ -106,8 +106,8 @@ class MultiqubitPlatform(AbstractPlatform):
 
                     # update Qblox qubit LO drive frequency config
                     instrument_name = self.qubit_instrument_map[qubit][1]
-                    port = self.qdm[qubit].channel_port_map[self.qubit_channel_map[qubit][1]]
-                    drive_if = self.native_single_qubit_gates[qubit]["RX"]["if_frequency"]
+                    port = self.qdm[qubit]._channel_port_map[self.qubit_channel_map[qubit][1]]
+                    drive_if = self.single_qubit_natives[qubit]["RX"]["if_frequency"]
                     self.current_config["instruments"][instrument_name]["settings"]["ports"][port]["lo_frequency"] = (
                         freq - drive_if
                     )
@@ -152,7 +152,7 @@ class MultiqubitPlatform(AbstractPlatform):
         if hasattr(self, "qubit_instrument_map"):
             for qubit in range(self.nqubits):
                 instrument_name = self.qubit_instrument_map[qubit][0]
-                port = self.qrm[qubit].channel_port_map[self.qubit_channel_map[qubit][0]]
+                port = self.qrm[qubit]._channel_port_map[self.qubit_channel_map[qubit][0]]
                 att = self.current_config["instruments"][instrument_name]["settings"]["ports"][port]["attenuation"]
                 self.ro_port[qubit].attenuation = att
 
@@ -181,7 +181,7 @@ class MultiqubitPlatform(AbstractPlatform):
                     attenuation = int(value)
                     # save current_config
                     instrument_name = self.qubit_instrument_map[qubit][0]
-                    port = self.qrm[qubit].channel_port_map[self.qubit_channel_map[qubit][0]]
+                    port = self.qrm[qubit]._channel_port_map[self.qubit_channel_map[qubit][0]]
                     self.current_config["instruments"][instrument_name]["settings"]["ports"][port][
                         "attenuation"
                     ] = attenuation
@@ -193,7 +193,7 @@ class MultiqubitPlatform(AbstractPlatform):
                     sweetspot = float(value)
                     # save current_config
                     instrument_name = self.qubit_instrument_map[qubit][2]
-                    port = elf.qrm[qubit].channel_port_map[self.qubit_channel_map[qubit][2]]
+                    port = elf.qrm[qubit]._channel_port_map[self.qubit_channel_map[qubit][2]]
                     self.current_config["instruments"][instrument_name]["settings"]["ports"][port][offset] = sweetspot
                     # configure instrument qcm_bb offset
                     self.qb_port[qubit].current = sweetspot
@@ -204,8 +204,8 @@ class MultiqubitPlatform(AbstractPlatform):
 
                     # update Qblox qubit LO drive frequency config
                     instrument_name = self.qubit_instrument_map[qubit][1]
-                    port = self.qdm[qubit].channel_port_map[self.qubit_channel_map[qubit][1]]
-                    drive_if = self.native_single_qubit_gates[qubit]["RX"]["if_frequency"]
+                    port = self.qdm[qubit]._channel_port_map[self.qubit_channel_map[qubit][1]]
+                    drive_if = self.single_qubit_natives[qubit]["RX"]["if_frequency"]
                     self.current_config["instruments"][instrument_name]["settings"]["ports"][port]["lo_frequency"] = (
                         freq - drive_if
                     )
