@@ -47,8 +47,8 @@ class MultiqubitPlatform(AbstractPlatform):
         self.hardware_avg = self.settings["settings"]["hardware_avg"]
         self.relaxation_time = self.settings["settings"]["relaxation_time"]
 
-        if self.is_connected:
-            self.setup()
+        # if self.is_connected:
+        #     self.setup()
 
         # FIX: Set attenuation again to the original value after sweep attenuation in punchout
         if hasattr(self, "qubit_instrument_map"):
