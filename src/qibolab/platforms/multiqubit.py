@@ -7,7 +7,7 @@ from qibo.config import log, raise_error
 from qibolab.platforms.abstract import AbstractPlatform, Qubit
 from qibolab.pulses import PulseSequence, PulseType
 from qibolab.result import ExecutionResults
-from qibolab.sweeper import Parameter
+from qibolab.sweeper import Parameter, Sweeper
 
 
 class MultiqubitPlatform(AbstractPlatform):
@@ -25,13 +25,14 @@ class MultiqubitPlatform(AbstractPlatform):
             instance = InstrumentClass(name, address)
             self.instruments[name] = instance
 
-        # Generate qubit_instrument_map from qubit_channel_map and the instruments' channel_port_maps
+        # Generate qubit_instrument_map from runcard
         self.qubit_instrument_map = {}
         for qubit in self.qubit_channel_map:
             self.qubit_instrument_map[qubit] = [None, None, None, None]
             for name in self.instruments:
-                if "channel_port_map" in self.settings["instruments"][name]["settings"]:
-                    for channel in self.settings["instruments"][name]["settings"]["channel_port_map"]:
+                if self.settings["instruments"][name]["class"] in ["ClusterQRM_RF", "ClusterQCM_RF", "ClusterQCM"]:
+                    for port in self.settings["instruments"][name]["settings"]["ports"]:
+                        channel = self.settings["instruments"][name]["settings"]["ports"][port]["channel"]
                         if channel in self.qubit_channel_map[qubit]:
                             self.qubit_instrument_map[qubit][self.qubit_channel_map[qubit].index(channel)] = name
                 if "s4g_modules" in self.settings["instruments"][name]["settings"]:
@@ -44,7 +45,108 @@ class MultiqubitPlatform(AbstractPlatform):
         self.characterization = self.settings["characterization"]
         self.qubit_channel_map = self.settings["qubit_channel_map"]
         self.hardware_avg = self.settings["settings"]["hardware_avg"]
-        self.repetition_duration = self.settings["settings"]["repetition_duration"]
+        self.relaxation_time = self.settings["settings"]["relaxation_time"]
+
+        if self.is_connected:
+            self.setup()
+
+        # FIX: Set attenuation again to the original value after sweep attenuation in punchout
+        if hasattr(self, "qubit_instrument_map"):
+            for qubit in range(self.nqubits):
+                instrument_name = self.qubit_instrument_map[qubit][0]
+                port = self.qrm[qubit].channel_port_map[self.qubit_channel_map[qubit][0]]
+                att = self.current_config["instruments"][instrument_name]["settings"]["ports"][port]["attenuation"]
+                self.ro_port[qubit].attenuation = att
+
+    def update(self, updates: dict):
+        r"""Updates platform dependent runcard parameters and set up platform instruments if needed.
+
+        Args:
+
+            updates (dict): Dictionary containing the parameters to update the runcard.
+        """
+        for par, values in updates.items():
+            for qubit, value in values.items():
+                # log.info(f"qubit readout instrument: {self.qubit_instrument_map[qubit][0]}")
+                # log.info(f"qubit drive instrument: {self.qubit_instrument_map[qubit][1]}")
+                # log.info(f"qubit bias instrument: {self.qubit_instrument_map[qubit][2]}")
+                # log.info(f"qubit flux instrument: {self.qubit_instrument_map[qubit][3]}")
+
+                # log.info(f"qubit read out channel: {self.ro_channel[qubit]}")
+                # log.info(f"qubit qubit drive channel: {self.qd_channel[qubit]}")
+                # log.info(f"qubit qubit bias channel: {self.qb_channel[qubit]}")
+                # log.info(f"qubit qubit flux channel: {self.qf_channel[qubit]}")
+                # log.info(f"attenuation before updating: {self.ro_port[qubit].attenuation}")
+
+                # resonator_punchout_attenuation
+                if par == "readout_attenuation":
+                    attenuation = int(value)
+                    # save current_config
+                    instrument_name = self.qubit_instrument_map[qubit][0]
+                    port = self.qrm[qubit].channel_port_map[self.qubit_channel_map[qubit][0]]
+                    self.current_config["instruments"][instrument_name]["settings"]["ports"][port][
+                        "attenuation"
+                    ] = attenuation
+                    # configure RO attenuation
+                    self.ro_port[qubit].attenuation = attenuation
+
+                # resonator_spectroscopy_flux / qubit_spectroscopy_flux
+                if par == "sweetspot":
+                    sweetspot = float(value)
+                    # save current_config
+                    instrument_name = self.qubit_instrument_map[qubit][2]
+                    port = elf.qrm[qubit].channel_port_map[self.qubit_channel_map[qubit][2]]
+                    self.current_config["instruments"][instrument_name]["settings"]["ports"][port][offset] = sweetspot
+                    # configure instrument qcm_bb offset
+                    self.qb_port[qubit].current = sweetspot
+
+                # qubit_spectroscopy / qubit_spectroscopy_flux / ramsey
+                if par == "drive_frequency":
+                    freq = int(value * 1e9)
+
+                    # update Qblox qubit LO drive frequency config
+                    instrument_name = self.qubit_instrument_map[qubit][1]
+                    port = self.qdm[qubit].channel_port_map[self.qubit_channel_map[qubit][1]]
+                    drive_if = self.native_single_qubit_gates[qubit]["RX"]["if_frequency"]
+                    self.current_config["instruments"][instrument_name]["settings"]["ports"][port]["lo_frequency"] = (
+                        freq - drive_if
+                    )
+
+                    # set Qblox qubit LO drive frequency
+                    self.qd_port[qubit].lo_frequency = freq - drive_if
+
+                # classification
+                if par == "threshold":
+                    threshold = float(value)
+                    # update Qblox qubit classification threshold
+                    instrument_name = self.qubit_instrument_map[qubit][0]
+                    self.current_config["instruments"][instrument_name]["settings"]["classification_parameters"][qubit][
+                        "threshold"
+                    ] = threshold
+
+                    self.instruments[instrument_name].setup(
+                        **self.current_config["settings"],
+                        **self.current_config["instruments"][instrument_name]["settings"],
+                    )
+
+                # classification
+                if par == "iq_angle":
+                    rotation_angle = float(value)
+                    rotation_angle = (
+                        -rotation_angle * 360 / (2 * np.pi)
+                    ) % 360  # save rotation angle in degrees for qblox
+                    # update Qblox qubit classification iq angle
+                    instrument_name = self.qubit_instrument_map[qubit][0]
+                    self.current_config["instruments"][instrument_name]["settings"]["classification_parameters"][qubit][
+                        "rotation_angle"
+                    ] = rotation_angle
+
+                    self.instruments[instrument_name].setup(
+                        **self.current_config["settings"],
+                        **self.current_config["instruments"][instrument_name]["settings"],
+                    )
+
+                super().update(updates)
 
         # FIX: Set attenuation again to the original value after sweep attenuation in punchout
         if hasattr(self, "qubit_instrument_map"):
@@ -156,6 +258,32 @@ class MultiqubitPlatform(AbstractPlatform):
     def get_lo_readout_frequency(self, qubit):
         return self.ro_port[qubit].lo_frequency
 
+    def set_lo_twpa_frequency(self, qubit, freq):
+        for instrument in self.instruments:
+            if "twpa" in instrument:
+                self.instruments[instrument].frequency = freq
+                return None
+        raise_error(NotImplementedError, "No twpa instrument found in the platform. ")
+
+    def get_lo_twpa_frequency(self, qubit):
+        for instrument in self.instruments:
+            if "twpa" in instrument:
+                return self.instruments[instrument].frequency
+        raise_error(NotImplementedError, "No twpa instrument found in the platform. ")
+
+    def set_lo_twpa_power(self, qubit, power):
+        for instrument in self.instruments:
+            if "twpa" in instrument:
+                self.instruments[instrument].power = power
+                return None
+        raise_error(NotImplementedError, "No twpa instrument found in the platform. ")
+
+    def get_lo_twpa_power(self, qubit):
+        for instrument in self.instruments:
+            if "twpa" in instrument:
+                return self.instruments[instrument].power
+        raise_error(NotImplementedError, "No twpa instrument found in the platform. ")
+
     def set_attenuation(self, qubit, att):
         self.ro_port[qubit].attenuation = att
 
@@ -185,7 +313,6 @@ class MultiqubitPlatform(AbstractPlatform):
         if not self.is_connected:
             try:
                 for name in self.instruments:
-                    log.info(f"Connecting to {self.name} instrument {name}.")
                     self.instruments[name].connect()
                 self.is_connected = True
             except Exception as exception:
@@ -193,6 +320,10 @@ class MultiqubitPlatform(AbstractPlatform):
                     RuntimeError,
                     "Cannot establish connection to " f"{self.name} instruments. " f"Error captured: '{exception}'",
                 )
+                # TODO: check for exception 'The instrument qrm_rf0 does not have parameters in0_att' and reboot the cluster
+
+            else:
+                log.info(f"All platform instruments connected.")
 
     def setup(self):
         if not self.is_connected:
@@ -230,17 +361,17 @@ class MultiqubitPlatform(AbstractPlatform):
             if not self.qubit_instrument_map[qubit][0] is None:
                 self.qrm[qubit] = self.instruments[self.qubit_instrument_map[qubit][0]]
                 self.ro_port[qubit] = self.qrm[qubit].ports[
-                    self.qrm[qubit].channel_port_map[self.qubit_channel_map[qubit][0]]
+                    self.qrm[qubit]._channel_port_map[self.qubit_channel_map[qubit][0]]
                 ]
             if not self.qubit_instrument_map[qubit][1] is None:
                 self.qdm[qubit] = self.instruments[self.qubit_instrument_map[qubit][1]]
                 self.qd_port[qubit] = self.qdm[qubit].ports[
-                    self.qdm[qubit].channel_port_map[self.qubit_channel_map[qubit][1]]
+                    self.qdm[qubit]._channel_port_map[self.qubit_channel_map[qubit][1]]
                 ]
             if not self.qubit_instrument_map[qubit][2] is None:
                 self.qfm[qubit] = self.instruments[self.qubit_instrument_map[qubit][2]]
                 self.qf_port[qubit] = self.qfm[qubit].ports[
-                    self.qfm[qubit].channel_port_map[self.qubit_channel_map[qubit][2]]
+                    self.qfm[qubit]._channel_port_map[self.qubit_channel_map[qubit][2]]
                 ]
             if not self.qubit_instrument_map[qubit][3] is None:
                 self.qbm[qubit] = self.instruments[self.qubit_instrument_map[qubit][3]]
@@ -262,219 +393,323 @@ class MultiqubitPlatform(AbstractPlatform):
                 self.instruments[name].disconnect()
             self.is_connected = False
 
-    def execute_pulse_sequence(self, sequence: PulseSequence, nshots=None):
+    def execute_pulse_sequence(
+        self,
+        sequence: PulseSequence,
+        nshots=None,
+        navgs=None,
+        relaxation_time=None,
+        sweepers: list() = [],  # list(Sweeper) = []
+    ):
         if not self.is_connected:
             raise_error(RuntimeError, "Execution failed because instruments are not connected.")
-        if nshots is None:
-            nshots = self.hardware_avg
+        if nshots is None and navgs is None:
+            nshots = 1
+            navgs = self.hardware_avg
+        elif nshots and navgs is None:
+            navgs = 1
+        elif navgs and nshots is None:
+            nshots = 1
 
+        if relaxation_time is None:
+            relaxation_time = self.relaxation_time
+        repetition_duration = sequence.finish + relaxation_time
+
+        num_bins = nshots
+        for sweeper in sweepers:
+            num_bins *= len(sweeper.values)
+
+        # DEBUG: Plot Pulse Sequence
+        # sequence.plot('plot.png')
+        # DEBUG: sync_en
+        # from qblox_instruments.qcodes_drivers.cluster import Cluster
+        # cluster:Cluster = self.instruments['cluster'].device
+        # for module in cluster.modules:
+        #     if module.get("present"):
+        #         for sequencer in module.sequencers:
+        #             if sequencer.get('sync_en'):
+        #                 print(f"type: {module.module_type}, sequencer: {sequencer.name}, sync_en: True")
+
+        # Process Pulse Sequence. Assign pulses to instruments and generate waveforms & program
         instrument_pulses = {}
-        changed = {}
-
-        readout_instruments = [
-            self.instruments[instrument]
-            for instrument in self.instruments
-            if self.settings["instruments"][instrument]["roles"] == ["readout"]
-        ]
-
-        control_instruments = [
-            self.instruments[instrument]
-            for instrument in self.instruments
-            if self.settings["instruments"][instrument]["roles"] == ["control"]
-        ]
-
-        # STEP 1: upload sequence
-        for instrument in readout_instruments + control_instruments:
-            instrument_pulses[instrument.name] = copy.deepcopy(sequence.get_channel_pulses(*instrument.channels))
-            for pulse in instrument_pulses[instrument.name]:
-                # FIXME: this will not work with arbitrary frequencies
-                if abs(pulse.frequency) > instrument.FREQUENCY_LIMIT:
-                    changed[pulse] = pulse.serial
-                    if instrument in readout_instruments:
-                        if_frequency = self.native_gates["single_qubit"][pulse.qubit]["MZ"]["if_frequency"]
-                        self.set_lo_readout_frequency(pulse.qubit, pulse.frequency - if_frequency)
-                    elif instrument in control_instruments:
-                        if_frequency = self.native_gates["single_qubit"][pulse.qubit]["RX"]["if_frequency"]
-                        self.set_lo_drive_frequency(pulse.qubit, pulse.frequency - if_frequency)
-                    pulse.frequency = if_frequency
-            instrument.process_pulse_sequence(instrument_pulses[instrument.name], nshots, self.repetition_duration)
-            instrument.upload()
-
-        # STEP 2: play sequence
-        for instrument in readout_instruments + control_instruments:
-            if instrument_pulses[instrument.name]:
-                instrument.play_sequence()
-        # STEP 3: acquire results
-        acquisition_results = {}
-        for instrument in readout_instruments:
-            if instrument_pulses[instrument.name] and instrument_pulses[instrument.name].ro_pulses:
-                results = instrument.acquire()
-                existing_keys = set(acquisition_results.keys()) & set(results.keys())
-                for key, value in results.items():
-                    if key in existing_keys:
-                        acquisition_results[key].update(value)
-                    else:
-                        acquisition_results[key] = value
-
+        roles = {}
         data = {}
-        for serial in acquisition_results:
-            for if_pulse, original in changed.items():
-                if serial == if_pulse.serial:
-                    data[original] = data[if_pulse.qubit] = ExecutionResults.from_components(
-                        *acquisition_results[serial]
-                    )
+        for name in self.instruments:
+            roles[name] = self.settings["instruments"][name]["roles"]
+            if "control" in roles[name] or "readout" in roles[name]:
+                instrument_pulses[name] = sequence.get_channel_pulses(*self.instruments[name].channels)
 
+                # until we have frequency planning use the ifs stored in the runcard to change the los
+                if self.instruments[name].__class__.__name__.split(".")[-1] in [
+                    "ClusterQRM_RF",
+                    "ClusterQCM_RF",
+                    "ClusterQCM",
+                ]:
+                    for port in self.instruments[name].ports:
+                        _los = []
+                        _ifs = []
+                        port_pulses = instrument_pulses[name].get_channel_pulses(
+                            self.instruments[name]._port_channel_map[port]
+                        )
+                        for pulse in port_pulses:
+                            if pulse.type == PulseType.READOUT:
+                                _if = int(self.native_gates["single_qubit"][pulse.qubit]["MZ"]["if_frequency"])
+                                pulse._if = _if
+                                _los.append(int(pulse.frequency - _if))
+                                _ifs.append(int(_if))
+                            elif pulse.type == PulseType.DRIVE:
+                                _if = int(self.native_gates["single_qubit"][pulse.qubit]["RX"]["if_frequency"])
+                                pulse._if = _if
+                                _los.append(int(pulse.frequency - _if))
+                                _ifs.append(int(_if))
+
+                        if len(_los) > 1:
+                            for _ in range(1, len(_los)):
+                                if _los[0] != _los[_]:
+                                    raise ValueError(
+                                        f"Pulses:\n{instrument_pulses[name]}\nsharing the lo at device: {name} - port: {port}\ncannot be synthesised with intermediate frequencies:\n{_ifs}"
+                                    )
+                        if len(_los) > 0:
+                            self.instruments[name].ports[port].lo_frequency = _los[0]
+
+                self.instruments[name].process_pulse_sequence(
+                    instrument_pulses[name], navgs, nshots, repetition_duration, sweepers
+                )
+                self.instruments[name].upload()
+        for name in self.instruments:
+            if "control" in roles[name] or "readout" in roles[name]:
+                if True:  # not instrument_pulses[name].is_empty:
+                    self.instruments[name].play_sequence()
+
+        acquisition_results = {}
+        for name in self.instruments:
+            if "readout" in roles[name]:
+                if not instrument_pulses[name].is_empty:
+                    if not instrument_pulses[name].ro_pulses.is_empty:
+                        results = self.instruments[name].acquire()
+                        existing_keys = set(acquisition_results.keys()) & set(results.keys())
+                        for key, value in results.items():
+                            if key in existing_keys:
+                                acquisition_results[key].update(value)
+                            else:
+                                acquisition_results[key] = value
+
+        for ro_pulse in sequence.ro_pulses:
+            data[ro_pulse.serial] = ExecutionResults.from_components(*acquisition_results[ro_pulse.serial])
+            data[ro_pulse.qubit] = copy.copy(data[ro_pulse.serial])
         return data
 
-    def sweep(self, sequence, *sweepers, nshots=1024, average=True, relaxation_time=None):
-        results = {}
-        sweeper_pulses = {}
+    def sweep(self, sequence, *sweepers, nshots=None, average=True, relaxation_time=None):
+        id_results = {}
+        map_id_serial = {}
+        sequence_copy = sequence.copy()
 
-        # create copy of the sequence
-        copy_sequence = copy.deepcopy(sequence)
-        map_original_shifted = {pulse: pulse.serial for pulse in copy.deepcopy(copy_sequence).ro_pulses}
+        if nshots is None:
+            nshots = self.hardware_avg
+        navgs = nshots
+        if average:
+            nshots = 1
+        else:
+            navgs = 1
 
-        # create dictionary containing pulses for each sweeper that point to the same original sequence
-        # which is copy_sequence
+        if relaxation_time is None:
+            relaxation_time = self.relaxation_time
+
+        sweepers_copy = []
         for sweeper in sweepers:
-            if sweeper.pulses is not None:
-                sweeper_pulses[sweeper.parameter] = {
-                    pulse.serial: pulse for pulse in copy_sequence if pulse in sweeper.pulses
-                }
+            if sweeper.pulses:
+                ps = [sequence_copy[sequence_copy.index(pulse)] for pulse in sweeper.pulses]
+            else:
+                ps = None
+            sweepers_copy.append(
+                Sweeper(
+                    parameter=sweeper.parameter,
+                    values=sweeper.values,
+                    pulses=ps,
+                    qubits=sweeper.qubits,
+                )
+            )
+        sweepers_copy.reverse()
 
-        # perform sweeping recursively
+        for pulse in sequence_copy.ro_pulses:
+            map_id_serial[pulse.id] = pulse.serial
+            id_results[pulse.id] = ExecutionResults.from_components(np.array([]), np.array([]))
+            id_results[pulse.qubit] = id_results[pulse.id]
+
         self._sweep_recursion(
-            copy_sequence,
-            copy.deepcopy(sequence),
-            *sweepers,
+            sequence_copy,
+            *tuple(sweepers_copy),
+            results=id_results,
             nshots=nshots,
+            navgs=navgs,
             average=average,
             relaxation_time=relaxation_time,
-            results=results,
-            sweeper_pulses=sweeper_pulses,
-            map_original_shifted=map_original_shifted,
         )
 
-        return results
+        serial_results = {}
+        for pulse in sequence_copy.ro_pulses:
+            serial_results[map_id_serial[pulse.id]] = id_results[pulse.id]
+            serial_results[pulse.qubit] = id_results[pulse.id]
+        return serial_results
 
     def _sweep_recursion(
         self,
         sequence,
-        original_sequence,
         *sweepers,
-        nshots=1024,
-        average=True,
-        relaxation_time=None,
-        results=None,
-        sweeper_pulses=None,
-        map_original_shifted=None,
+        results,
+        nshots,
+        navgs,
+        relaxation_time,
+        average,
     ):
         sweeper = sweepers[0]
 
-        # store values before starting to sweep
-        if sweeper.pulses is not None:
-            original_value = self._save_original_value(sweeper, sweeper_pulses)
-
-        # perform sweep recursively
-        for value in sweeper.values:
-            self._update_pulse_sequence_parameters(
-                sweeper, sweeper_pulses, original_sequence, map_original_shifted, value
-            )
-            if len(sweepers) > 1:
-                self._sweep_recursion(
-                    sequence,
-                    original_sequence,
-                    *sweepers[1:],
-                    nshots=nshots,
-                    average=average,
-                    relaxation_time=relaxation_time,
-                    results=results,
-                    sweeper_pulses=sweeper_pulses,
-                    map_original_shifted=map_original_shifted,
-                )
-            else:
-                new_sequence = copy.deepcopy(sequence)
-                result = self.execute_pulse_sequence(new_sequence, nshots)
-
-                # colllect result and append to original pulse
-                for original_pulse, new_serial in map_original_shifted.items():
-                    acquisition = result[new_serial].average if average else result[new_serial]
-
-                    if original_pulse.serial in results:
-                        results[original_pulse.serial] += acquisition
-                        results[original_pulse.qubit] += acquisition
-                    else:
-                        results[original_pulse.serial] = acquisition
-                        results[original_pulse.qubit] = copy.copy(results[original_pulse.serial])
-
-        # restore initial value of the pulse
-        if sweeper.pulses is not None:
-            self._restore_initial_value(sweeper, sweeper_pulses, original_value)
-
-    def _save_original_value(self, sweeper, sweeper_pulses):
-        """Helper method for _sweep_recursion"""
-        original_value = {}
-        pulses = sweeper_pulses[sweeper.parameter]
-        # save original value of the parameter swept
-        for pulse in pulses:
-            if sweeper.parameter is Parameter.attenuation:
-                original_value[pulse] = self.get_attenuation(pulses[pulse].qubit)
-            elif sweeper.parameter is Parameter.gain:
-                original_value[pulse] = self.get_gain(pulses[pulse].qubit)
-            elif sweeper.parameter is Parameter.bias:
-                original_value[pulse] = self.get_bias(self.qubits[pulses[pulse].qubit])
-            else:
-                original_value[pulse] = getattr(pulses[pulse], sweeper.parameter.name)
-        return original_value
-
-    def _restore_initial_value(self, sweeper, sweeper_pulses, original_value):
-        """Helper method for _sweep_recursion"""
-        pulses = sweeper_pulses[sweeper.parameter]
-        for pulse in pulses:
-            if sweeper.parameter is Parameter.attenuation:
-                self.set_attenuation(pulses[pulse].qubit, original_value[pulse])
-            elif sweeper.parameter is Parameter.gain:
-                self.set_gain(pulses[pulse].qubit, original_value[pulse])
-            elif sweeper.parameter is Parameter.bias:
-                self.set_bias(self.qubits[pulses[pulse].qubit], original_value[pulse])
-            else:
-                setattr(pulses[pulse], sweeper.parameter.name, original_value[pulse])
-
-    def _update_pulse_sequence_parameters(
-        self, sweeper, sweeper_pulses, original_sequence, map_original_shifted, value
-    ):
-        """Helper method for _sweep_recursion"""
-        if sweeper.pulses is not None:
-            pulses = sweeper_pulses[sweeper.parameter]
-            for pulse in pulses:
-                update_value = value
-                if sweeper.parameter is Parameter.frequency:
-                    if pulses[pulse].type is PulseType.READOUT:
-                        update_value += self.qubits[pulses[pulse].qubit].readout_frequency
-                    else:
-                        update_value += self.qubits[pulses[pulse].qubit].drive_frequency
-                    setattr(pulses[pulse], sweeper.parameter.name, update_value)
-                elif sweeper.parameter is Parameter.amplitude:
-                    if pulses[pulse].type is PulseType.READOUT:
-                        current_amplitude = self.native_gates["single_qubit"][pulses[pulse].qubit]["MZ"]["amplitude"]
-                    else:
-                        current_amplitude = self.native_gates["single_qubit"][pulses[pulse].qubit]["RX"]["amplitude"]
-                    setattr(pulses[pulse], sweeper.parameter.name, float(current_amplitude * update_value))
-                if pulses[pulse].type is PulseType.READOUT:
-                    to_modify = [
-                        pulse1 for pulse1 in original_sequence.ro_pulses if pulse1.qubit == pulses[pulse].qubit
-                    ]
-                    if to_modify:
-                        map_original_shifted[to_modify[0]] = pulses[pulse].serial
-
-        if sweeper.qubits is not None:
+        initial = {}
+        if sweeper.parameter is Parameter.attenuation:
             for qubit in sweeper.qubits:
+                initial[qubit] = self.get_attenuation(qubit)
+
+        elif sweeper.parameter is Parameter.relative_phase:
+            initial = {}
+            for pulse in sweeper.pulses:
+                initial[pulse.id] = pulse.relative_phase
+
+        elif sweeper.parameter is Parameter.lo_frequency:
+            initial = {}
+            for pulse in sweeper.pulses:
+                if pulse.type == PulseType.READOUT:
+                    initial[pulse.id] = self.get_lo_readout_frequency(pulse.qubit)
+                elif pulse.type == PulseType.DRIVE:
+                    initial[pulse.id] = self.get_lo_readout_frequency(pulse.qubit)
+
+        # elif sweeper.parameter is Parameter.frequency:
+        #     initial = {}
+        #     for pulse in sweeper.pulses:
+        #         initial[pulse.id] = pulse.frequency
+        # elif sweeper.parameter is Parameter.bias:
+        #     initial = {}
+        #     for qubit in sweeper.qubits:
+        #         initial[qubit] = self.get_bias(qubit)
+
+        elif sweeper.parameter is Parameter.gain:
+            for pulse in sweeper.pulses:
+                self.set_gain(pulse.qubit, 1)
+        elif sweeper.parameter is Parameter.amplitude:
+            for pulse in sweeper.pulses:
+                pulse.amplitude = 1
+
+        for_loop_sweepers = [Parameter.attenuation, Parameter.lo_frequency, Parameter.relative_phase]
+        rt_sweepers = [
+            Parameter.frequency,
+            Parameter.gain,
+            Parameter.bias,
+            Parameter.amplitude,
+            Parameter.start,
+            Parameter.duration,
+        ]
+
+        if sweeper.parameter in for_loop_sweepers:
+            # perform sweep recursively
+            for value in sweeper.values:
                 if sweeper.parameter is Parameter.attenuation:
-                    self.set_attenuation(qubit, value)
-                elif sweeper.parameter is Parameter.gain:
-                    self.set_gain(qubit, value)
-                elif sweeper.parameter is Parameter.bias:
-                    self.set_bias(qubit, value)
+                    for qubit in sweeper.qubits:
+                        # self.set_attenuation(qubit, initial[qubit] + value)
+                        self.set_attenuation(qubit, value)  # make att absolute
+                if sweeper.parameter is Parameter.relative_phase:
+                    for pulse in sweeper.pulses:
+                        pulse.relative_phase = initial[pulse.id] + value
+                elif sweeper.parameter is Parameter.lo_frequency:
+                    for pulse in sweeper.pulses:
+                        if pulse.type == PulseType.READOUT:
+                            self.set_lo_readout_frequency(initial[pulse.id] + value)
+                        elif pulse.type == PulseType.DRIVE:
+                            self.set_lo_readout_frequency(initial[pulse.id] + value)
+
+                if len(sweepers) > 1:
+                    self._sweep_recursion(
+                        sequence,
+                        *sweepers[1:],
+                        results=results,
+                        nshots=nshots,
+                        navgs=navgs,
+                        average=average,
+                        relaxation_time=relaxation_time,
+                    )
+                else:
+                    result = self.execute_pulse_sequence(sequence, nshots, navgs, relaxation_time)
+                    for pulse in sequence.ro_pulses:
+                        results[pulse.id] += result[pulse.serial].average if average else result[pulse.serial]
+                        results[pulse.qubit] = results[pulse.id]
+        else:
+            if all(s.parameter in rt_sweepers for s in sweepers):
+                # rt-based sweepers
+                num_bins = nshots
+                for sweeper in sweepers:
+                    num_bins *= len(sweeper.values)
+
+                if num_bins < 2**17:
+                    repetition_duration = sequence.finish + relaxation_time
+                    execution_time = navgs * num_bins * ((repetition_duration + 1000 * len(sweepers)) * 1e-9)
+                    log.info(
+                        f"Real time sweeper execution time: {int(execution_time)//60}m {int(execution_time) % 60}s"
+                    )
+
+                    result = self.execute_pulse_sequence(sequence, nshots, navgs, relaxation_time, sweepers)
+                    for pulse in sequence.ro_pulses:
+                        results[pulse.id] += result[pulse.serial]
+                        results[pulse.qubit] = results[pulse.id]
+                else:
+                    sweepers_repetitions = 1
+                    for sweeper in sweepers:
+                        sweepers_repetitions *= len(sweeper.values)
+                    if sweepers_repetitions < 2**17:
+                        # split nshots
+                        max_rt_nshots = (2**17) // sweepers_repetitions
+                        num_full_sft_iterations = nshots // max_rt_nshots
+                        num_bins = max_rt_nshots * sweepers_repetitions
+
+                        for sft_iteration in range(num_full_sft_iterations + 1):
+                            _nshots = min(max_rt_nshots, nshots - sft_iteration * max_rt_nshots)
+                            self._sweep_recursion(
+                                sequence,
+                                *sweepers,
+                                results=results,
+                                nshots=_nshots,
+                                navgs=navgs,
+                                average=average,
+                                relaxation_time=relaxation_time,
+                            )
+                    else:
+                        for shot in range(nshots):
+                            num_bins = 1
+                            for sweeper in sweepers[1:]:
+                                num_bins *= len(sweeper.values)
+                            sweeper = sweepers[0]
+                            max_rt_iterations = (2**17) // num_bins
+                            num_full_sft_iterations = len(sweeper.values) // max_rt_iterations
+                            num_bins = nshots * max_rt_iterations
+                            for sft_iteration in range(num_full_sft_iterations + 1):
+                                _from = sft_iteration * max_rt_iterations
+                                _to = min((sft_iteration + 1) * max_rt_iterations, len(sweeper.values))
+                                _values = sweeper.values[_from:_to]
+                                split_sweeper = Sweeper(
+                                    parameter=sweeper.parameter,
+                                    values=_values,
+                                    pulses=sweeper.pulses,
+                                    qubits=sweeper.qubits,
+                                )
+
+                                self._sweep_recursion(
+                                    sequence,
+                                    *(tuple([split_sweeper]) + sweepers[1:]),
+                                    results=results,
+                                    nshots=nshots,
+                                    navgs=navgs,
+                                    average=average,
+                                    relaxation_time=relaxation_time,
+                                )
+            else:
+                raise Exception("cannot execute a for-loop sweeper nested inside of a rt sweeper")
 
     def measure_fidelity(self, qubits=None, nshots=None):
         self.reload_settings()

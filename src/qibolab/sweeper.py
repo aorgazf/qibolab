@@ -11,13 +11,17 @@ class Parameter(Enum):
     frequency = auto()
     amplitude = auto()
     relative_phase = auto()
+    delay = auto()
+    start = auto()
+    duration = auto()
 
     attenuation = auto()
     gain = auto()
     bias = auto()
+    lo_frequency = auto()
 
 
-QubitParameter = {Parameter.bias, Parameter.attenuation, Parameter.gain}
+QubitParameter = {Parameter.bias, Parameter.attenuation}
 
 
 @dataclass
