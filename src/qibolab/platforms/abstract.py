@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import List, Optional
 
 import numpy as np
 import yaml
@@ -69,6 +69,8 @@ class Qubit:
     twpa: Optional[Channel] = None
     drive: Optional[Channel] = None
     flux: Optional[Channel] = None
+
+    classifiers_hpars: dict = field(default_factory=dict)
 
     def __post_init__(self):
         # register qubit in ``flux`` channel so that we can access
@@ -181,7 +183,8 @@ class AbstractPlatform(ABC):
             for key, item in self.qubits[qubit].__dict__.items():
                 if isinstance(item, float) or isinstance(item, int) or isinstance(item, complex) and not key == "name":
                     settings["characterization"]["single_qubit"][qubit][key] = item
-
+                elif key == "classifiers_hpars":
+                    settings["characterization"]["single_qubit"][qubit][key] = item
         with open(path, "a") as file:
             yaml.dump(settings, file, sort_keys=False, indent=4, default_flow_style=False)
 
@@ -238,6 +241,8 @@ class AbstractPlatform(ABC):
                     self.single_qubit_natives[qubit]["RX"]["duration"] = int(value)
                 elif par == "t2_spin_echo":
                     self.qubits[qubit].T2_spin_echo = int(value)
+                elif par == "classifiers_hpars":
+                    self.qubits[qubit].classifiers_hpars = value
                 elif par == "readout_attenuation":
                     True
                 else:
