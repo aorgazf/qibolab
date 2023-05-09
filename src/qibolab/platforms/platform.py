@@ -61,6 +61,10 @@ class DesignPlatform(AbstractPlatform):
             options=options,
         )
 
+    def update(self, updates: dict):
+        self.design.update(updates)
+        super().update(updates)
+
     def set_lo_drive_frequency(self, qubit, freq):
         self.qubits[qubit].drive.local_oscillator.frequency = freq
 
@@ -86,16 +90,16 @@ class DesignPlatform(AbstractPlatform):
         return self.qubits[qubit].twpa.local_oscillator.power
 
     def set_attenuation(self, qubit, att):
-        raise_error(NotImplementedError, f"{self.name} does not support attenuation.")
+        self.qubits[qubit].readout.ports[0].attenuation = att
 
     def get_attenuation(self, qubit):
-        raise_error(NotImplementedError, f"{self.name} does not support attenuation.")
+        return self.qubits[qubit].readout.ports[0].attenuation
 
-    def set_gain(self, qubit, gain):
-        raise_error(NotImplementedError, f"{self.name} does not support gain.")
+    def set_gain(self, qubit, gain):  # TODO: in qblox, there is readout gain and drive gain
+        self.qubits[qubit].readout.ports[0].gain = gain
 
     def get_gain(self, qubit):
-        raise_error(NotImplementedError, f"{self.name} does not support gain.")
+        return self.qubits[qubit].readout.ports[0].gain
 
     def set_bias(self, qubit, bias):
         self.qubits[qubit].flux.bias = bias

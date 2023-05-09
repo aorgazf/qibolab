@@ -173,6 +173,11 @@ def create_tii_qw5q_gold_qblox(runcard):
     Args:
         runcard (str): Path to the runcard file.
     """
+    from qibolab.instruments.qblox.controller import QbloxController
+
+    controller = QbloxController("qblox_controller", runcard)
+    controller.connect()
+
     # Create channel objects
     channels = ChannelMap()
     # readout
@@ -186,73 +191,71 @@ def create_tii_qw5q_gold_qblox(runcard):
     # TWPA
     channels |= ChannelMap.from_names("L4-26")
 
-    # # Instantiate instruments
-    # from qibolab.instruments.qblox.cluster import (
-    #     Cluster,
-    #     ClusterQCM,
-    #     ClusterQCM_RF,
-    #     ClusterQRM_RF,
-    # )
-    # from qibolab.instruments.rohde_schwarz import SGS100A
+    cluster = controller.instruments["cluster"]
+    qrm_rf0 = controller.instruments["qrm_rf0"]
+    qrm_rf1 = controller.instruments["qrm_rf1"]
+    qcm_rf2 = controller.instruments["qcm_rf2"]
+    qcm_rf3 = controller.instruments["qcm_rf3"]
+    qcm_rf4 = controller.instruments["qcm_rf4"]
+    qcm_bb1 = controller.instruments["qcm_bb1"]
+    qcm_bb2 = controller.instruments["qcm_bb2"]
+    twpa_pump = controller.instruments["twpa_pump"]
 
-    # cluster = Cluster("cluster", "192.168.0.6")
-    # qrm_rf0 = ClusterQRM_RF("qrm_rf0", "192.168.0.6:10")
-    # qrm_rf1 = ClusterQRM_RF("qrm_rf1", "192.168.0.6:12")
-    # qcm_rf2 = ClusterQCM_RF("qcm_rf2", "192.168.0.6:8")
-    # qcm_rf3 = ClusterQCM_RF("qcm_rf3", "192.168.0.6:3")
-    # qcm_rf4 = ClusterQCM_RF("cluster", "192.168.0.6:4")
-    # qcm_bb1 = ClusterQCM("cluster", "192.168.0.6:2")
-    # qcm_bb2 = ClusterQCM("cluster", "192.168.0.6:5")
-    # twpa_pump = SGS100A("twpa_pump", "192.168.0.37")
+    # Map ports to channels
+    # readout
+    channels["L3-25_a"].ports = [qrm_rf0.ports["o1"]]
+    channels["L3-25_b"].ports = [qrm_rf1.ports["o1"]]
+    channels["L3-25_a"].local_oscillator = qrm_rf0.local_oscillators["o1"]
+    channels["L3-25_b"].local_oscillator = qrm_rf1.local_oscillators["o1"]
+    # feedback
+    channels["L2-5_a"].ports = [qrm_rf0.ports["i1"]]
+    channels["L2-5_b"].ports = [qrm_rf1.ports["i1"]]
 
-    # instruments = [cluster, qrm_rf0, qrm_rf1, qcm_rf2, qcm_rf3, qcm_rf4, qcm_bb1, qcm_bb2, twpa_pump]
+    # drive
+    channels["L3-11"].ports = [qcm_rf3.ports["o1"]]
+    channels["L3-12"].ports = [qcm_rf3.ports["o2"]]
+    channels["L3-13"].ports = [qcm_rf4.ports["o1"]]
+    channels["L3-14"].ports = [qcm_rf4.ports["o2"]]
+    channels["L3-15"].ports = [qcm_rf2.ports["o1"]]
+    channels["L3-11"].local_oscillator = qcm_rf3.local_oscillators["o1"]
+    channels["L3-12"].local_oscillator = qcm_rf3.local_oscillators["o2"]
+    channels["L3-13"].local_oscillator = qcm_rf4.local_oscillators["o1"]
+    channels["L3-14"].local_oscillator = qcm_rf4.local_oscillators["o2"]
+    channels["L3-15"].local_oscillator = qcm_rf2.local_oscillators["o1"]
+
+    # flux
+    channels["L4-1"].ports = [qcm_bb1.ports["o1"]]
+    channels["L4-2"].ports = [qcm_bb1.ports["o2"]]
+    channels["L4-3"].ports = [qcm_bb1.ports["o3"]]
+    channels["L4-4"].ports = [qcm_bb1.ports["o4"]]
+    channels["L4-5"].ports = [qcm_bb2.ports["o1"]]
+
+    # TWPA
+    channels["L4-26"].local_oscillator = twpa_pump
 
     # # Map controllers to qubit channels (HARDCODED)
     # # readout
-    # channels["L3-25_a"].ports = [qrm_rf0.port['o1']]
-    # channels["L3-25_b"].ports = [qrm_rf1.port['o1']]
+    # channels["L3-25_a"].ports = [("qrm_rf0", "o1")]
+    # channels["L3-25_b"].ports = [("qrm_rf1", "o1")]
     # # feedback
-    # channels["L2-5_a"].ports = [qrm_rf0.port['i1']]
-    # channels["L2-5_b"].ports = [qrm_rf1.port['i1']]
+    # channels["L2-5_a"].ports = [("qrm_rf0", "i1")]
+    # channels["L2-5_b"].ports = [("qrm_rf1", "i1")]
     # # drive
-    # channels["L3-11"].ports = [qcm_rf3.port['o1']]
-    # channels["L3-12"].ports = [qcm_rf3.port['o2']]
-    # channels["L3-13"].ports = [qcm_rf4.port['o1']]
-    # channels["L3-14"].ports = [qcm_rf4.port['o2']]
-    # channels["L3-15"].ports = [qcm_rf2.port['o1']]
+    # channels["L3-11"].ports = [("qcm_rf3", "o1")]
+    # channels["L3-12"].ports = [("qcm_rf3", "o2")]
+    # channels["L3-13"].ports = [("qcm_rf4", "o1")]
+    # channels["L3-14"].ports = [("qcm_rf4", "o2")]
+    # channels["L3-15"].ports = [("qcm_rf2", "o1")]
 
     # # flux
-    # channels["L4-1"].ports = [qcm_bb1.port['o1']]
-    # channels["L4-2"].ports = [qcm_bb1.port['o2']]
-    # channels["L4-3"].ports = [qcm_bb1.port['o3']]
-    # channels["L4-4"].ports = [qcm_bb1.port['o4']]
-    # channels["L4-5"].ports = [qcm_bb2.port['o1']]
+    # channels["L4-1"].ports = [("qcm_bb1", "o1")]
+    # channels["L4-2"].ports = [("qcm_bb1", "o2")]
+    # channels["L4-3"].ports = [("qcm_bb1", "o3")]
+    # channels["L4-4"].ports = [("qcm_bb1", "o4")]
+    # channels["L4-5"].ports = [("qcm_bb2", "o1")]
 
-    # Map controllers to qubit channels (HARDCODED)
-    # readout
-    channels["L3-25_a"].ports = [("qrm_rf0", "o1")]
-    channels["L3-25_b"].ports = [("qrm_rf1", "o1")]
-    # feedback
-    channels["L2-5_a"].ports = [("qrm_rf0", "i1")]
-    channels["L2-5_b"].ports = [("qrm_rf1", "i1")]
-    # drive
-    channels["L3-11"].ports = [("qcm_rf3", "o1")]
-    channels["L3-12"].ports = [("qcm_rf3", "o2")]
-    channels["L3-13"].ports = [("qcm_rf4", "o1")]
-    channels["L3-14"].ports = [("qcm_rf4", "o2")]
-    channels["L3-15"].ports = [("qcm_rf2", "o1")]
-
-    # flux
-    channels["L4-1"].ports = [("qcm_bb1", "o1")]
-    channels["L4-2"].ports = [("qcm_bb1", "o2")]
-    channels["L4-3"].ports = [("qcm_bb1", "o3")]
-    channels["L4-4"].ports = [("qcm_bb1", "o4")]
-    channels["L4-5"].ports = [("qcm_bb2", "o1")]
-
-    from qibolab.instruments.qblox.controller import QbloxController
-
-    controller = QbloxController("qblox_controller", runcard)
     controller.channels = channels
+
     platform = DesignPlatform("qw5q_gold_qblox", controller, runcard)
 
     # assign channels to qubits
@@ -260,9 +263,11 @@ def create_tii_qw5q_gold_qblox(runcard):
     for q in [0, 1, 5]:
         qubits[q].readout = channels["L3-25_a"]
         qubits[q].feedback = channels["L2-5_a"]
+        qubits[q].twpa = channels["L4-26"]
     for q in [2, 3, 4]:
         qubits[q].readout = channels["L3-25_b"]
         qubits[q].feedback = channels["L2-5_b"]
+        qubits[q].twpa = channels["L4-26"]
 
     qubits[0].drive = channels["L3-15"]
     qubits[0].flux = channels["L4-5"]
