@@ -186,26 +186,26 @@ def create_tii_qw5q_gold_qblox(runcard):
     # TWPA
     channels |= ChannelMap.from_names("L4-26")
 
-    # Instantiate instruments
-    from qibolab.instruments.qblox import (
-        Cluster,
-        ClusterQCM,
-        ClusterQCM_RF,
-        ClusterQRM_RF,
-    )
-    from qibolab.instruments.rohde_schwarz import SGS100A
+    # # Instantiate instruments
+    # from qibolab.instruments.qblox.cluster import (
+    #     Cluster,
+    #     ClusterQCM,
+    #     ClusterQCM_RF,
+    #     ClusterQRM_RF,
+    # )
+    # from qibolab.instruments.rohde_schwarz import SGS100A
 
-    cluster = Cluster("cluster", "192.168.0.6")
-    qrm_rf0 = ClusterQRM_RF("qrm_rf0", "192.168.0.6:10")
-    qrm_rf1 = ClusterQRM_RF("qrm_rf1", "192.168.0.6:12")
-    qcm_rf2 = ClusterQCM_RF("qcm_rf2", "192.168.0.6:8")
-    qcm_rf3 = ClusterQCM_RF("qcm_rf3", "192.168.0.6:3")
-    qcm_rf4 = ClusterQCM_RF("cluster", "192.168.0.6:4")
-    qcm_bb1 = ClusterQCM("cluster", "192.168.0.6:2")
-    qcm_bb2 = ClusterQCM("cluster", "192.168.0.6:5")
-    twpa_pump = SGS100A("twpa_pump", "192.168.0.37")
+    # cluster = Cluster("cluster", "192.168.0.6")
+    # qrm_rf0 = ClusterQRM_RF("qrm_rf0", "192.168.0.6:10")
+    # qrm_rf1 = ClusterQRM_RF("qrm_rf1", "192.168.0.6:12")
+    # qcm_rf2 = ClusterQCM_RF("qcm_rf2", "192.168.0.6:8")
+    # qcm_rf3 = ClusterQCM_RF("qcm_rf3", "192.168.0.6:3")
+    # qcm_rf4 = ClusterQCM_RF("cluster", "192.168.0.6:4")
+    # qcm_bb1 = ClusterQCM("cluster", "192.168.0.6:2")
+    # qcm_bb2 = ClusterQCM("cluster", "192.168.0.6:5")
+    # twpa_pump = SGS100A("twpa_pump", "192.168.0.37")
 
-    instruments = [cluster, qrm_rf0, qrm_rf1, qcm_rf2, qcm_rf3, qcm_rf4, qcm_bb1, qcm_bb2, twpa_pump]
+    # instruments = [cluster, qrm_rf0, qrm_rf1, qcm_rf2, qcm_rf3, qcm_rf4, qcm_bb1, qcm_bb2, twpa_pump]
 
     # # Map controllers to qubit channels (HARDCODED)
     # # readout
@@ -249,8 +249,11 @@ def create_tii_qw5q_gold_qblox(runcard):
     channels["L4-4"].ports = [("qcm_bb1", "o4")]
     channels["L4-5"].ports = [("qcm_bb2", "o1")]
 
-    design = InstrumentDesign(instruments, channels)
-    platform = DesignPlatform("qw5q_gold", design, runcard)
+    from qibolab.instruments.qblox.controller import QbloxController
+
+    controller = QbloxController("qblox_controller", runcard)
+    controller.channels = channels
+    platform = DesignPlatform("qw5q_gold_qblox", controller, runcard)
 
     # assign channels to qubits
     qubits = platform.qubits
@@ -349,11 +352,11 @@ def Platform(name, runcard=None, design=None):
         return create_dummy(runcard)
     elif name == "icarusq":
         from qibolab.platforms.icplatform import ICPlatform as Device
-    elif name == "qw5q_gold":
+    elif name == "qw5q_gold_qblox":
         return create_tii_qw5q_gold_qblox(runcard)
     elif name == "tii1q_b1":
         return create_tii_rfsoc4x2(runcard)
     else:
-        from qibolab.platforms.multiqubit import MultiqubitPlatform as Device
+        from qibolab.instruments.qblox.controller import QbloxController as Device
 
     return Device(name, runcard)

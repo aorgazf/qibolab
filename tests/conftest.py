@@ -2,8 +2,8 @@ from importlib import import_module
 
 import pytest
 
+from qibolab.instruments.qblox.controller import MultiqubitPlatform
 from qibolab.platform import Platform
-from qibolab.platforms.multiqubit import MultiqubitPlatform
 
 
 def pytest_addoption(parser):
@@ -34,7 +34,7 @@ def pytest_addoption(parser):
 def load_from_platform(platform, name):
     """Loads instrument from platform, if it is available.
 
-    Useful only for testing :class:`qibolab.platforms.multiqubit.MultiqubitPlatform`.
+    Useful only for testing :class:`qibolab.instruments.qblox.qblox_manager.MultiqubitPlatform`.
     """
     if not isinstance(platform, MultiqubitPlatform):
         pytest.skip(f"Skipping MultiqubitPlatform test for {platform}.")

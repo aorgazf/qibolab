@@ -1,4 +1,4 @@
-"""Tests :class:`qibolab.platforms.multiqubit.MultiqubitPlatform` and
+"""Tests :class:`qibolab.instruments.qblox.qblox_manager.MultiqubitPlatform` and
 :class:`qibolab.platforms.platform.DesignPlatform`.
 """
 import os
@@ -15,9 +15,9 @@ from qibo.states import CircuitResult
 
 from qibolab import Platform
 from qibolab.backends import QibolabBackend
+from qibolab.instruments.qblox.controller import MultiqubitPlatform
 from qibolab.paths import qibolab_folder
 from qibolab.platforms.abstract import AbstractPlatform
-from qibolab.platforms.multiqubit import MultiqubitPlatform
 from qibolab.pulses import PulseSequence
 
 qubit = 0
