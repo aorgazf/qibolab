@@ -44,44 +44,44 @@ topology: # qubit - qubit connections
 
 # no bias line, using qblox offset from qcm_bbc
 channels: [
-  'L2-5a','L2-5b', 'L3-25a', 'L3-25b', #RO channels: Ro lines L2-5 and L3-25 splitted
+  'L2-5_a','L2-5_b', 'L3-25_a', 'L3-25_b', #RO channels: Ro lines L2-5 and L3-25 splitted
   'L3-15', 'L3-11', 'L3-12', 'L3-13', 'L3-14', 'L3-16', # Drive channels q0, q1, q2, q3, q4 | not used ports label: L3-16
   'L4-5', 'L4-1', 'L4-2', 'L4-3', 'L4-4', 'L4-6', 'L4-7', 'L4-8', # Flux channels q0, q1, q2, q3, q4 | not used labels: 'L4-6', 'L4-7', 'L4-8'
 ]
 
 # [ReadOut, QubitDrive, QubitFlux, QubitBias]
 qubit_channel_map:
-    0:   [L3-25a, L3-15, L4-5, null] #q0
-    1:   [L3-25a, L3-11, L4-1, null] #q1
-    2:   [L3-25b, L3-12, L4-2, null] #q2
-    3:   [L3-25b, L3-13, L4-3, null] #q3
-    4:   [L3-25b, L3-14, L4-4, null] #q4
-    5:   [L3-25a,  null, null, null] #q5 witness
+    0:   [L3-25_a, L3-15, L4-5, null] #q0
+    1:   [L3-25_a, L3-11, L4-1, null] #q1
+    2:   [L3-25_b, L3-12, L4-2, null] #q2
+    3:   [L3-25_b, L3-13, L4-3, null] #q3
+    4:   [L3-25_b, L3-14, L4-4, null] #q4
+    5:   [L3-25_a,  null, null, null] #q5 witness
 
 instruments:
     cluster:
-        lib: qblox
+        lib: qblox.cluster
         class: Cluster
         address: 192.168.0.6
         roles: [other]
         settings:
             reference_clock_source      : internal                      # external or internal
 
-    qrm_rf1: # ReadOut module 10 controllin qubits q0, q1, q5
-        lib: qblox
+    qrm_rf0: # ReadOut module 10 controllin qubits q0, q1, q5
+        lib: qblox.cluster
         class: ClusterQRM_RF
         address: 192.168.0.6:10
         roles: [readout]
         settings:
             ports:
                 o1:
-                    channel                     : L3-25a
+                    channel                     : L3-25_a
                     attenuation                 : 38                        # should be multiple of 2
                     lo_enabled                  : true
                     lo_frequency                : 7_255_000_000             # (Hz) from 2e9 to 18e9
                     gain                        : 0.6                       # for path0 and path1 -1.0<=v<=1.0
                 i1:
-                    channel                     : L2-5a
+                    channel                     : L2-5_a
                     acquisition_hold_off        : 500                       # must be multiple of 4
                     acquisition_duration        : 900
 
@@ -93,21 +93,21 @@ instruments:
                     rotation_angle              : 16.069                   # in degrees 0.0<=v<=360.0
                     threshold                   : 0.002124                  # in V
 
-    qrm_rf2: # ReadOut module 12: controlling qubits q2, q3, q4
-        lib: qblox
+    qrm_rf1: # ReadOut module 12: controlling qubits q2, q3, q4
+        lib: qblox.cluster
         class: ClusterQRM_RF
         address: 192.168.0.6:12
         roles: [readout]
         settings:
             ports:
                 o1:
-                    channel                     : L3-25b
+                    channel                     : L3-25_b
                     attenuation                 : 32                        # should be multiple of 2
                     lo_enabled                  : true
                     lo_frequency                : 7_850_000_000             # (Hz) from 2e9 to 18e9
                     gain                        : 0.6                       # for path0 and path1 -1.0<=v<=1.0
                 i1:
-                    channel                     : L2-5b
+                    channel                     : L2-5_b
                     acquisition_hold_off        : 500
                     acquisition_duration        : 900
 
@@ -122,8 +122,8 @@ instruments:
                     rotation_angle              : 302.555                   # in degrees 0.0<=v<=360.0
                     threshold                   : 0.001366                  # in V
 
-    qcm_rf1:
-        lib: qblox
+    qcm_rf2:
+        lib: qblox.cluster
         class: ClusterQCM_RF
         address: 192.168.0.6:8
         roles: [control]
@@ -136,8 +136,8 @@ instruments:
                     lo_frequency        : 5_245_414_655             # (Hz) from 2e9 to 18e9
                     gain                : 0.470                     # for path0 and path1 -1.0<=v<=1.0
 
-    qcm_rf2:
-        lib: qblox
+    qcm_rf3:
+        lib: qblox.cluster
         class: ClusterQCM_RF
         address: 192.168.0.6:3
         roles: [control]
@@ -156,8 +156,8 @@ instruments:
                     lo_frequency        : 5_994_176_000             # (Hz) from 2e9 to 18e9
                     gain                : 0.655                     # for path0 and path1 -1.0<=v<=1.0
 
-    qcm_rf3:
-        lib: qblox
+    qcm_rf4:
+        lib: qblox.cluster
         class: ClusterQCM_RF
         address: 192.168.0.6:4
         roles: [control]
@@ -178,7 +178,7 @@ instruments:
 
     #Cluster QCM usado para bias mediante el offset
     qcm_bb1:
-        lib: qblox
+        lib: qblox.cluster
         class: ClusterQCM
         address: 192.168.0.6:5
         roles: [control]
@@ -189,7 +189,7 @@ instruments:
 
     #Cluster QCM usado para bias mediante el offset
     qcm_bb2:
-        lib: qblox
+        lib: qblox.cluster
         class: ClusterQCM
         address: 192.168.0.6:2
         roles: [control]

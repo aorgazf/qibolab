@@ -169,8 +169,135 @@ def create_tii_qw5q_gold_qm(runcard, simulation_duration=None, address=None, clo
 
     return platform
 
-    return platform
+def create_tii_qw5q_gold_qblox(runcard):
+    """Create platform using qblox instruments.
 
+    Args:
+        runcard (str): Path to the runcard file.
+    """
+    from qibolab.instruments.qblox.controller import QbloxController
+
+    controller = QbloxController("qblox_controller", runcard)
+    controller.connect()
+
+    # Create channel objects
+    channels = ChannelMap()
+    # readout
+    channels |= ChannelMap.from_names("L3-25_a", "L3-25_b")
+    # feedback
+    channels |= ChannelMap.from_names("L2-5_a", "L2-5_b")
+    # drive
+    channels |= ChannelMap.from_names(*(f"L3-{i}" for i in range(11, 16)))
+    # flux
+    channels |= ChannelMap.from_names(*(f"L4-{i}" for i in range(1, 6)))
+    # TWPA
+    channels |= ChannelMap.from_names("L4-26")
+
+    cluster = controller.instruments["cluster"]
+    qrm_rf0 = controller.instruments["qrm_rf0"]
+    qrm_rf1 = controller.instruments["qrm_rf1"]
+    qcm_rf2 = controller.instruments["qcm_rf2"]
+    qcm_rf3 = controller.instruments["qcm_rf3"]
+    qcm_rf4 = controller.instruments["qcm_rf4"]
+    qcm_bb1 = controller.instruments["qcm_bb1"]
+    qcm_bb2 = controller.instruments["qcm_bb2"]
+    twpa_pump = controller.instruments["twpa_pump"]
+
+    # Map ports to channels
+    # readout
+    channels["L3-25_a"].ports = [qrm_rf0.ports["o1"]]
+    channels["L3-25_b"].ports = [qrm_rf1.ports["o1"]]
+    # channels["L3-25_a"].local_oscillator = qrm_rf0.local_oscillators["o1"]
+    # channels["L3-25_b"].local_oscillator = qrm_rf1.local_oscillators["o1"]
+    # feedback
+    channels["L2-5_a"].ports = [qrm_rf0.ports["i1"]]
+    channels["L2-5_b"].ports = [qrm_rf1.ports["i1"]]
+
+    # drive
+    channels["L3-11"].ports = [qcm_rf3.ports["o1"]]
+    channels["L3-12"].ports = [qcm_rf3.ports["o2"]]
+    channels["L3-13"].ports = [qcm_rf4.ports["o1"]]
+    channels["L3-14"].ports = [qcm_rf4.ports["o2"]]
+    channels["L3-15"].ports = [qcm_rf2.ports["o1"]]
+
+    # channels["L3-11"].local_oscillator = qcm_rf3.local_oscillators["o1"]
+    # channels["L3-12"].local_oscillator = qcm_rf3.local_oscillators["o2"]
+    # channels["L3-13"].local_oscillator = qcm_rf4.local_oscillators["o1"]
+    # channels["L3-14"].local_oscillator = qcm_rf4.local_oscillators["o2"]
+    # channels["L3-15"].local_oscillator = qcm_rf2.local_oscillators["o1"]
+
+    # flux
+    channels["L4-1"].ports = [qcm_bb1.ports["o1"]]
+    channels["L4-2"].ports = [qcm_bb1.ports["o2"]]
+    channels["L4-3"].ports = [qcm_bb1.ports["o3"]]
+    channels["L4-4"].ports = [qcm_bb1.ports["o4"]]
+    channels["L4-5"].ports = [qcm_bb2.ports["o1"]]
+
+    # TWPA
+    channels["L4-26"].local_oscillator = twpa_pump
+
+    # # Map controllers to qubit channels (HARDCODED)
+    # # readout
+    # channels["L3-25_a"].ports = [("qrm_rf0", "o1")]
+    # channels["L3-25_b"].ports = [("qrm_rf1", "o1")]
+    # # feedback
+    # channels["L2-5_a"].ports = [("qrm_rf0", "i1")]
+    # channels["L2-5_b"].ports = [("qrm_rf1", "i1")]
+    # # drive
+    # channels["L3-11"].ports = [("qcm_rf3", "o1")]
+    # channels["L3-12"].ports = [("qcm_rf3", "o2")]
+    # channels["L3-13"].ports = [("qcm_rf4", "o1")]
+    # channels["L3-14"].ports = [("qcm_rf4", "o2")]
+    # channels["L3-15"].ports = [("qcm_rf2", "o1")]
+
+    # # flux
+    # channels["L4-1"].ports = [("qcm_bb1", "o1")]
+    # channels["L4-2"].ports = [("qcm_bb1", "o2")]
+    # channels["L4-3"].ports = [("qcm_bb1", "o3")]
+    # channels["L4-4"].ports = [("qcm_bb1", "o4")]
+    # channels["L4-5"].ports = [("qcm_bb2", "o1")]
+
+    controller.channels = channels
+
+    platform = DesignPlatform("qw5q_gold_qblox", controller, runcard)
+
+    # assign channels to qubits
+    qubits = platform.qubits
+    for q in [0, 1, 5]:
+        qubits[q].readout = channels["L3-25_a"]
+        qubits[q].feedback = channels["L2-5_a"]
+        qubits[q].twpa = channels["L4-26"]
+    for q in [2, 3, 4]:
+        qubits[q].readout = channels["L3-25_b"]
+        qubits[q].feedback = channels["L2-5_b"]
+        qubits[q].twpa = channels["L4-26"]
+
+    qubits[0].drive = channels["L3-15"]
+    qubits[0].flux = channels["L4-5"]
+    channels["L4-5"].qubit = qubits[0]
+    for q in range(1, 5):
+        qubits[q].drive = channels[f"L3-{10 + q}"]
+        qubits[q].flux = channels[f"L4-{q}"]
+        channels[f"L4-{q}"].qubit = qubits[q]
+
+    # set maximum allowed bias
+    for q in range(5):
+        platform.qubits[q].flux.max_bias = 2.5
+   
+    # Platfom topology
+    Q = [f"q{i}" for i in range(5)]
+    chip = nx.Graph()
+    chip.add_nodes_from(Q)
+    graph_list = [
+        (Q[0], Q[2]),
+        (Q[1], Q[2]),
+        (Q[3], Q[2]),
+        (Q[4], Q[2]),
+    ]
+    chip.add_edges_from(graph_list)
+    platform.topology = chip
+
+    return platform
 
 def create_tii_rfsoc4x2(runcard, address=None):
     """Create platform using QICK project on the RFSoC4x2 board
@@ -235,9 +362,11 @@ def Platform(name, runcard=None, design=None):
         from qibolab.platforms.icplatform import ICPlatform as Device
     elif name == "qw5q_gold_qm":
         return create_tii_qw5q_gold_qm(runcard)
+    elif name == "qw5q_gold_qblox":
+        return create_tii_qw5q_gold_qblox(runcard)
     elif name == "tii1q_b1":
         return create_tii_rfsoc4x2(runcard)
     else:
-        from qibolab.platforms.multiqubit import MultiqubitPlatform as Device
+        from qibolab.instruments.qblox.controller import QbloxController as Device
 
     return Device(name, runcard)

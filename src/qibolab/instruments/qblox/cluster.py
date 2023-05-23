@@ -30,7 +30,7 @@ from qblox_instruments.qcodes_drivers.qcm_qrm import QcmQrm as QbloxQrmQcm
 from qblox_instruments.qcodes_drivers.sequencer import Sequencer as QbloxSequencer
 
 from qibolab.instruments.abstract import AbstractInstrument, InstrumentException
-from qibolab.instruments.qblox_q1asm import (
+from qibolab.instruments.qblox.q1asm import (
     Block,
     Program,
     Register,

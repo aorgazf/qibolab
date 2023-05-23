@@ -10,7 +10,7 @@ from qibolab.result import ExecutionResults
 from qibolab.sweeper import Parameter, Sweeper
 
 
-class MultiqubitPlatform(AbstractPlatform):
+class QbloxController(AbstractPlatform):
     def __init__(self, name, runcard):
         super().__init__(name, runcard)
         self.instruments = {}
