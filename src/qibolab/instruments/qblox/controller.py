@@ -402,7 +402,7 @@ class QbloxController(AbstractPlatform):
             data[ro_pulse.qubit] = copy.copy(data[ro_pulse.serial])
         return data
 
-    def sweep(self, sequence, *sweepers, nshots=None, average=True, relaxation_time=None):
+    def sweep(self, qubits, sequence, *sweepers, nshots=None, average=True, relaxation_time=None):
         id_results = {}
         map_id_serial = {}
         sequence_copy = sequence.copy()
