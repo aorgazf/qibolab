@@ -46,6 +46,7 @@ class QbloxController(AbstractPlatform):
         self.channels = ChannelMap.from_names(*self.settings["channels"])
 
     def reload_settings(self):
+        print("entroooo")
         super().reload_settings()
         self.characterization = self.settings["characterization"]
         self.qubit_channel_map = self.settings["qubit_channel_map"]
@@ -137,7 +138,7 @@ class QbloxController(AbstractPlatform):
                         **self.settings["instruments"][instrument_name]["settings"],
                     )
 
-                super().update(updates)
+                # super().update(updates)
 
     def set_lo_drive_frequency(self, qubit, freq):
         self.qd_port[qubit].lo_frequency = freq
@@ -290,8 +291,31 @@ class QbloxController(AbstractPlatform):
                 self.instruments[name].disconnect()
             self.is_connected = False
 
+    # DesignPlatform interface
+    def play(self, qubits, sequence, nshots, relaxation_time, average=False, raw_adc=False):
+        
+        if nshots is None:
+            nshots = self.hardware_avg
+        navgs = nshots
+        if average:
+            nshots = 1
+        else:
+            navgs = 1
+
+        if relaxation_time is None:
+            relaxation_time = self.relaxation_time
+
+        return self.execute_pulse_sequence(
+            qubits=qubits,
+            sequence=sequence,
+            nshots=nshots,
+            navgs=navgs,
+            relaxation_time=relaxation_time,
+        )
+
     def execute_pulse_sequence(
         self,
+        qubits,
         sequence: PulseSequence,
         nshots=None,
         navgs=None,
@@ -300,16 +324,17 @@ class QbloxController(AbstractPlatform):
     ):
         if not self.is_connected:
             raise_error(RuntimeError, "Execution failed because instruments are not connected.")
-        if nshots is None and navgs is None:
-            nshots = 1
-            navgs = self.hardware_avg
-        elif nshots and navgs is None:
-            navgs = 1
-        elif navgs and nshots is None:
-            nshots = 1
+        # if nshots is None and navgs is None:
+        #     nshots = 1
+        #     navgs = self.hardware_avg
+        # elif nshots and navgs is None:
+        #     navgs = 1
+        # elif navgs and nshots is None:
+        #     nshots = 1
 
-        if relaxation_time is None:
-            relaxation_time = self.relaxation_time
+        # if relaxation_time is None:
+        #     relaxation_time = self.relaxation_time
+
         repetition_duration = sequence.finish + relaxation_time
 
         num_bins = nshots
@@ -402,7 +427,15 @@ class QbloxController(AbstractPlatform):
             data[ro_pulse.qubit] = copy.copy(data[ro_pulse.serial])
         return data
 
-    def sweep(self, qubits, sequence, *sweepers, nshots=None, average=True, relaxation_time=None):
+    def sweep(
+        self, 
+        qubits, 
+        sequence, 
+        *sweepers, 
+        nshots=None, 
+        average=True, 
+        relaxation_time=None
+    ):
         id_results = {}
         map_id_serial = {}
         sequence_copy = sequence.copy()
@@ -446,13 +479,13 @@ class QbloxController(AbstractPlatform):
         if not contains_attenuation_frequency:
             sweepers_copy.reverse()
 
-
         for pulse in sequence_copy.ro_pulses:
             map_id_serial[pulse.id] = pulse.serial
             id_results[pulse.id] = ExecutionResults.from_components(np.array([]), np.array([]))
             id_results[pulse.qubit] = id_results[pulse.id]
 
         self._sweep_recursion(
+            qubits,
             sequence_copy,
             *tuple(sweepers_copy),
             results=id_results,
@@ -470,6 +503,7 @@ class QbloxController(AbstractPlatform):
 
     def _sweep_recursion(
         self,
+        qubits,
         sequence,
         *sweepers,
         results,
@@ -554,7 +588,7 @@ class QbloxController(AbstractPlatform):
                         relaxation_time=relaxation_time,
                     )
                 else:
-                    result = self.execute_pulse_sequence(sequence, nshots, navgs, relaxation_time)
+                    result = self.execute_pulse_sequence(qubits, sequence, nshots, navgs, relaxation_time)
                     for pulse in sequence.ro_pulses:
                         results[pulse.id] += result[pulse.serial].average if average else result[pulse.serial]
                         results[pulse.qubit] = results[pulse.id]
@@ -601,7 +635,7 @@ class QbloxController(AbstractPlatform):
                             f"Real time sweeper execution time: {int(execution_time)//60}m {int(execution_time) % 60}s"
                         )
 
-                        result = self.execute_pulse_sequence(sequence, nshots, navgs, relaxation_time, sweepers)
+                        result = self.execute_pulse_sequence(qubits, sequence, nshots, navgs, relaxation_time, sweepers)
                         for pulse in sequence.ro_pulses:
                             results[pulse.id] += result[pulse.serial]
                             results[pulse.qubit] = results[pulse.id]
@@ -657,71 +691,3 @@ class QbloxController(AbstractPlatform):
                                     )
                 else:
                     raise Exception("cannot execute a for-loop sweeper nested inside of a rt sweeper")
-
-    def measure_fidelity(self, qubits=None, nshots=None):
-        self.reload_settings()
-        if not qubits:
-            qubits = self.qubits
-        results = {}
-        for qubit in qubits:
-            self.qrm[qubit].ports["i1"].hardware_demod_en = True  # required for binning
-            # create exc sequence
-            sequence_exc = PulseSequence()
-            RX_pulse = self.create_RX_pulse(qubit, start=0)
-            ro_pulse = self.create_qubit_readout_pulse(qubit, start=RX_pulse.duration)
-            sequence_exc.add(RX_pulse)
-            sequence_exc.add(ro_pulse)
-            amplitude, phase, i, q = self.execute_pulse_sequence(sequence_exc, nshots=nshots)[
-                "demodulated_integrated_binned"
-            ][ro_pulse.serial]
-
-            iq_exc = i + 1j * q
-
-            sequence_gnd = PulseSequence()
-            ro_pulse = self.create_qubit_readout_pulse(qubit, start=0)
-            sequence_gnd.add(ro_pulse)
-
-            amplitude, phase, i, q = self.execute_pulse_sequence(sequence_gnd, nshots=nshots)[
-                "demodulated_integrated_binned"
-            ][ro_pulse.serial]
-            iq_gnd = i + 1j * q
-
-            iq_mean_exc = np.mean(iq_exc)
-            iq_mean_gnd = np.mean(iq_gnd)
-            origin = iq_mean_gnd
-
-            iq_gnd_translated = iq_gnd - origin
-            iq_exc_translated = iq_exc - origin
-            rotation_angle = np.angle(np.mean(iq_exc_translated))
-            # rotation_angle = np.angle(iq_mean_exc - origin)
-            iq_exc_rotated = iq_exc_translated * np.exp(-1j * rotation_angle) + origin
-            iq_gnd_rotated = iq_gnd_translated * np.exp(-1j * rotation_angle) + origin
-
-            # sort both lists of complex numbers by their real components
-            # combine all real number values into one list
-            # for each item in that list calculate the cumulative distribution
-            # (how many items above that value)
-            # the real value that renders the biggest difference between the two distributions is the threshold
-            # that is the one that maximises fidelity
-
-            real_values_exc = iq_exc_rotated.real
-            real_values_gnd = iq_gnd_rotated.real
-            real_values_combined = np.concatenate((real_values_exc, real_values_gnd))
-            real_values_combined.sort()
-
-            cum_distribution_exc = [
-                sum(map(lambda x: x.real >= real_value, real_values_exc)) for real_value in real_values_combined
-            ]
-            cum_distribution_gnd = [
-                sum(map(lambda x: x.real >= real_value, real_values_gnd)) for real_value in real_values_combined
-            ]
-            cum_distribution_diff = np.abs(np.array(cum_distribution_exc) - np.array(cum_distribution_gnd))
-            argmax = np.argmax(cum_distribution_diff)
-            threshold = real_values_combined[argmax]
-            errors_exc = nshots - cum_distribution_exc[argmax]
-            errors_gnd = cum_distribution_gnd[argmax]
-            fidelity = cum_distribution_diff[argmax] / nshots
-            assignment_fidelity = 1 - (errors_exc + errors_gnd) / nshots / 2
-            # assignment_fidelity = 1/2 + (cum_distribution_exc[argmax] - cum_distribution_gnd[argmax])/nshots/2
-            results[qubit] = ((rotation_angle * 360 / (2 * np.pi)) % 360, threshold, fidelity, assignment_fidelity)
-        return results

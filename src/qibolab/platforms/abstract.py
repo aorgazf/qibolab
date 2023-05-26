@@ -122,6 +122,7 @@ class AbstractPlatform(ABC):
             raise_error(RuntimeError, "Cannot access instrument because it is not connected.")
 
     def reload_settings(self):
+        print("salgooooo")
         # TODO: Remove ``self.settings``
         if self.settings == None:
             # Load initial configuration
@@ -139,7 +140,6 @@ class AbstractPlatform(ABC):
 
         self.topology = settings["topology"]
 
-        self.relaxation_time = settings["settings"]["relaxation_time"]
         self.relaxation_time = settings["settings"]["relaxation_time"]
         self.sampling_rate = settings["settings"]["sampling_rate"]
 
@@ -160,6 +160,11 @@ class AbstractPlatform(ABC):
                     setattr(self.qubits[q], name, value)
             else:
                 self.qubits[q] = Qubit(q, **settings["characterization"]["single_qubit"][q])
+
+        # if(self.name == "qw5q_gold_qblox"):
+        #     if hasattr(self, "design"):
+        #         self.design.reload_settings()
+
 
     def dump(self, path: Path):
         with open(path, "w") as file:
@@ -292,8 +297,13 @@ class AbstractPlatform(ABC):
                 else:
                     raise_error(ValueError, f"Unknown parameter {par} for qubit {qubit}")
 
+        if(self.name == "qw5q_gold_qblox"):
+            #call qblox controller update
+            self.design.update(updates)
+
         # reload_settings after execute any calibration routine keeping fitted parameters
-        self.reload_settings()
+        # self.reload_settings()
+
 
     @abstractmethod
     def connect(self):
